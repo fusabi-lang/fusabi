@@ -1,0 +1,58 @@
+# Rust
+target/
+Cargo.lock
+*.rs.bk
+*.pdb
+
+# F# / .NET
+bin/
+obj/
+*.fsproj.user
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+.vs/
+.vscode/
+*.swp
+*~
+
+# Transpiled files
+target/transpiled/
+
+# Coverage
+target/coverage/
+*.profraw
+*.profdata
+
+# Flamegraph
+flamegraph.svg
+perf.data
+perf.data.old
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+*.iml
+.idea/
+*.sublime-*
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Temporary files
+*.tmp
+*.temp
+*.swp
+.#*
+\#*#

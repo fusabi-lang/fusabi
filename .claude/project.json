@@ -1,0 +1,10 @@
+{
+  "name": "fsrs",
+  "description": "raibid-labs project",
+  "extends": "github:raibid-labs/workspace/.claude/base-project.json",
+  "customInstructions": [
+    "This project extends the raibid-labs organization configuration.",
+    "Type: lib",
+    "See workspace repo for base rules and conventions."
+  ]
+}

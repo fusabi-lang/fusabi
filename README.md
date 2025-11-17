@@ -1,194 +1,88 @@
-# F#-to-Rust Embedded Script Engine (FSRS)
+# fsrs
 
-## Overview
-This project enables authoring script modules in **F# syntax**, transpiling them via **Fable's Rust backend**, and embedding them inside a **Rust host application** with first-class integration (load, call, hot-reload, host-interop).
+`fsrs` is an experimental Mini‑F# dialect plus embeddable Rust VM designed to replace Lua‑style scripting in tools like terminal emulators (e.g. WezTerm).
 
-## Architecture
-1. F# source files (`.fs` / `.fsx`)
-2. Transpile using Fable with the `--lang rust` backend into Rust code
-3. Compile generated Rust code via Cargo
-4. Rust host application:
-   - Loads script modules as dynamic crates or static modules
-   - Invokes script-defined functions
-   - Exposes host-side functions/types to scripts
-   - Supports hot-reloading of script modules
+The goal:
 
-## Quick Start
+- F#-style developer ergonomics (records, DUs, pattern matching, pipelines, simple modules).
+- A small, eager, expression‑oriented language suitable for **embedded scripting and configs**.
+- A Lua‑class bytecode VM implemented in Rust (no .NET, no LLVM, no WASM required).
+- Designed for use in a Rust host (terminal emulator, CLI, etc.) with hot‑path callbacks.
 
-### Prerequisites
-- [Rust](https://rustup.rs) (latest stable)
-- [.NET SDK](https://dotnet.microsoft.com/download) (6.0 or later)
-- [Nushell](https://nushell.sh) (for automation scripts)
-- [Just](https://github.com/casey/just) (command runner)
+This repository is **bootstrap scaffolding**, design docs, and example configs to get the project started.
 
-### Installation
+## Layout
 
-```bash
-# Clone the repository
-git clone https://github.com/raibid-labs/fsrs.git
-cd fsrs
+- `README.md` — high‑level overview and goals (this file).
+- `docs/` — design docs for the language, VM, and embedding.
+- `examples/` — example Mini‑F# (`.fsrs`) configs and callback modules.
+- `scripts/` — helper scripts (Nushell) to scaffold the Rust workspace.
+- `rust/` — initial Rust workspace skeleton (front‑end, VM, demo host).
 
-# Run setup script
-just setup
+## Getting started
 
-# Build the project
-just build
+### 1. Prereqs
 
-# Run an example
-just example hello
+- Rust (latest stable) with `cargo`.
+- Nushell (for the optional bootstrap script): <https://www.nushell.sh>
+- A code assistant such as Claude Code in your editor (optional but recommended).
+
+### 2. Bootstrap the Rust workspace (optional)
+
+If you want to recreate the workspace from scratch, you can run:
+
+```nu
+use scripts/bootstrap.nu *
+bootstrap
 ```
 
-## Using Just Commands
+This will:
 
-FSRS uses [Just](https://github.com/casey/just) as a command runner for common tasks:
+- Create/refresh the `rust/` Cargo workspace.
+- Create crates:
+  - `fsrs-frontend` — parser, typechecker, desugaring for the Mini‑F# dialect.
+  - `fsrs-vm` — bytecode VM, value representation, GC, and built‑ins.
+  - `fsrs-demo` — small binary demonstrating embedding the language in a host program.
 
-```bash
-# View all available commands
-just
+You can also inspect the script and just follow its steps manually.
 
-# Development
-just dev              # Start watch mode with hot reload
-just build            # Build all components
-just test             # Run test suite
-just check            # Run all quality checks
+### 3. Build and run the demo host
 
-# Code Quality
-just fmt              # Format code
-just lint             # Run linters
-just audit            # Security audit
-
-# Examples
-just example hello    # Run hello example
-just run script.fsx   # Run a specific script
-
-# Documentation
-just docs             # Generate and open docs
-
-# Utilities
-just clean            # Clean build artifacts
-just version          # Show version info
-just ci               # Run CI checks locally
-```
-
-## Project Structure
-
-```
-fsrs/
-├── src/
-│   ├── host/                 # Rust host application
-│   ├── runtime/              # Script runtime and integration
-│   └── transpiler-extensions/# Fable extensions
-├── tests/
-│   ├── unit/                 # Unit tests
-│   └── integration/          # Integration tests
-├── examples/                 # Example F# scripts
-├── scripts/                  # Nushell automation scripts
-├── docs/                     # Documentation
-├── justfile                  # Just command definitions
-└── CLAUDE.md                 # Claude Code configuration
-
-## Nushell Scripts
-
-All automation is powered by Nushell scripts in `/scripts/`:
-
-- `setup.nu` - Environment setup
-- `build.nu` - Build orchestration
-- `test.nu` - Test automation
-- `transpile.nu` - F#-to-Rust transpilation
-- `dev.nu` - Development workflows
-- `run.nu` - Script execution
-- `format.nu` - Code formatting
-- `lint.nu` - Linting
-- `check.nu` - Quality checks
-- `clean.nu` - Cleanup
-- `docs.nu` - Documentation generation
-- `bench.nu` - Benchmarking
-- `install.nu` - Installation
-- `version.nu` - Version info
-- `ci.nu` - CI simulation
-- `init.nu` - Project initialization
-- `repl.nu` - Interactive REPL
-- `profile.nu` - Performance profiling
-- `release.nu` - Release preparation
-
-## Development Workflow
-
-### 1. Create a New F# Script
+From the `rust/` directory:
 
 ```bash
-# Initialize a new script project
-just init my-script
-
-# Edit the script
-nano examples/my-script/my-script.fsx
-
-# Run it
-just example my-script
+cd rust
+cargo build
+cargo run -p fsrs-demo
 ```
 
-### 2. Watch Mode Development
+Initially, `fsrs-demo` just:
 
-```bash
-# Start watch mode for automatic rebuilds
-just watch
+- Loads an example `.fsrs` script from `../examples/`.
+- Pretends to parse/compile it (stubbed).
+- Prints placeholder information to show the integration points you will fill in.
 
-# Or watch with automatic testing
-just watch-test
-```
+### 4. How to use these files with Claude Code
 
-### 3. Transpile F# to Rust
+See `docs/CLAUDE_CODE_NOTES.md` for detailed prompts and task breakdowns tailored for Claude Code.
 
-```bash
-# Transpile a specific file
-just transpile examples/hello.fsx
+High‑level flow:
 
-# Output is in target/transpiled/
-```
+1. Start in `rust/crates/fsrs-frontend/src/lib.rs` and follow the **Phase 1** tasks in `docs/CLAUDE_CODE_NOTES.md` to:
+   - Define the core AST,
+   - Implement a minimal tokenizer and parser for the Mini‑F# subset,
+   - Add basic error reporting.
 
-### 4. Testing
+2. Move on to the `fsrs-vm` crate and implement:
+   - `Value`, `Instruction`, `Chunk`, `Vm` structs,
+   - A minimal interpreter loop,
+   - A few built‑ins (ints, bools, strings, simple arithmetic).
 
-```bash
-# Run all tests
-just test
+3. Wire the two together in `fsrs-demo`:
+   - Parse & compile `examples/minifs_config.fsrs`,
+   - Execute it in the VM,
+   - Extract data for a pretend “terminal config”.
 
-# Run only unit tests
-just test-unit
+Each step is broken down in the design docs to be friendly to an AI code assistant.
 
-# Run only integration tests
-just test-integration
-
-# Generate coverage report
-just coverage
-```
-
-### 5. Quality Assurance
-
-```bash
-# Run all checks before committing
-just check
-
-# Individual checks
-just fmt-check
-just lint
-just audit
-```
-
-## Supported Features (Initial)
-- Let-bindings, functions, modules
-- Basic types: int, bool, string, list/array
-- Calling script functions from Rust host
-- Registering host functions callable from scripts
-- Hot-reload of script modules
-
-## Out of Scope (Initial)
-- Full F# type system: interfaces, generics, computation expressions
-- Full async workflows
-- Reflection
-- Full .NET BCL compatibility
-
-## Manual Transpilation Example
-
-If you want to transpile manually without using the scripts:
-
-```bash
-dotnet fable MyScript.fsx --lang rust
+---

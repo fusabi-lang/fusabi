@@ -1,0 +1,7 @@
+[workspace]
+members = [
+  "crates/fsrs-frontend",
+  "crates/fsrs-vm",
+  "crates/fsrs-demo",
+]
+resolver = "2"

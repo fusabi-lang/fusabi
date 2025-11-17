@@ -1,0 +1,8 @@
+[package]
+name = "fsrs-demo"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+fsrs-frontend = { path = "../fsrs-frontend" }
+fsrs-vm = { path = "../fsrs-vm" }

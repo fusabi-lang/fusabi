@@ -130,8 +130,12 @@ impl Compiler {
                 else_branch,
             } => self.compile_if(cond, then_branch, else_branch),
             Expr::Tuple(elements) => self.compile_tuple(elements),
-            Expr::List(_) => Ok(()),     // TODO: Layer 3
-            Expr::Cons { .. } => Ok(()), // TODO: Layer 3
+            Expr::List(elements) => self.compile_list(elements),
+            Expr::Cons { head, tail } => self.compile_cons(head, tail),
+            Expr::Array(_) => Ok(()),           // TODO: Arrays feature
+            Expr::ArrayIndex { .. } => Ok(()),  // TODO: Arrays feature
+            Expr::ArrayUpdate { .. } => Ok(()), // TODO: Arrays feature
+            Expr::ArrayLength(_) => Ok(()),     // TODO: Arrays feature
         }
     }
 
@@ -210,6 +214,43 @@ impl Compiler {
     }
 
     /// Compile a let-binding
+    /// Compile a list expression
+    fn compile_list(&mut self, elements: &[Expr]) -> CompileResult<()> {
+        // Handle empty list: [] -> emit LoadConst with Value::Nil
+        if elements.is_empty() {
+            let idx = self.add_constant(Value::Nil)?;
+            self.emit(Instruction::LoadConst(idx));
+            return Ok(());
+        }
+
+        // Check if list size fits in u16
+        if elements.len() > u16::MAX as usize {
+            return Err(CompileError::TupleTooLarge); // Reuse error, or add ListTooLarge
+        }
+
+        // Compile each element (left to right)
+        for element in elements {
+            self.compile_expr(element)?;
+        }
+
+        // Emit MakeList instruction with element count
+        let element_count = elements.len() as u16;
+        self.emit(Instruction::MakeList(element_count));
+
+        Ok(())
+    }
+
+    /// Compile a cons expression
+    fn compile_cons(&mut self, head: &Expr, tail: &Expr) -> CompileResult<()> {
+        // Compile head expression
+        self.compile_expr(head)?;
+        // Compile tail expression
+        self.compile_expr(tail)?;
+        // Emit Cons instruction
+        self.emit(Instruction::Cons);
+        Ok(())
+    }
+
     fn compile_let(&mut self, name: &str, value: &Expr, body: &Expr) -> CompileResult<()> {
         // Compile the value expression
         self.compile_expr(value)?;
@@ -984,4 +1025,240 @@ mod tests {
             .count();
         assert_eq!(make_tuple_count, 3);
     }
+}
+
+// ========================================================================
+// TDD: List Compilation Tests (Layer 3)
+// ========================================================================
+
+#[test]
+fn test_compile_list_empty() {
+    // []
+    let expr = Expr::List(vec![]);
+    let chunk = Compiler::compile(&expr).unwrap();
+
+    // Should have: LoadConst(Nil), Return
+    assert_eq!(chunk.constants.len(), 1);
+    assert_eq!(chunk.constants[0], Value::Nil);
+    assert_eq!(chunk.instructions[0], Instruction::LoadConst(0));
+    assert_eq!(chunk.instructions[1], Instruction::Return);
+}
+
+#[test]
+fn test_compile_list_single() {
+    // [42]
+    let expr = Expr::List(vec![Expr::Lit(Literal::Int(42))]);
+    let chunk = Compiler::compile(&expr).unwrap();
+
+    // Should have: LoadConst(42), MakeList(1), Return
+    assert_eq!(chunk.instructions[0], Instruction::LoadConst(0));
+    assert_eq!(chunk.instructions[1], Instruction::MakeList(1));
+    assert_eq!(chunk.instructions[2], Instruction::Return);
+}
+
+#[test]
+fn test_compile_list_multiple() {
+    // [1; 2; 3]
+    let expr = Expr::List(vec![
+        Expr::Lit(Literal::Int(1)),
+        Expr::Lit(Literal::Int(2)),
+        Expr::Lit(Literal::Int(3)),
+    ]);
+    let chunk = Compiler::compile(&expr).unwrap();
+
+    assert_eq!(chunk.instructions[0], Instruction::LoadConst(0));
+    assert_eq!(chunk.instructions[1], Instruction::LoadConst(1));
+    assert_eq!(chunk.instructions[2], Instruction::LoadConst(2));
+    assert_eq!(chunk.instructions[3], Instruction::MakeList(3));
+    assert_eq!(chunk.instructions[4], Instruction::Return);
+}
+
+#[test]
+fn test_compile_cons_simple() {
+    // 1 :: []
+    let expr = Expr::Cons {
+        head: Box::new(Expr::Lit(Literal::Int(1))),
+        tail: Box::new(Expr::List(vec![])),
+    };
+    let chunk = Compiler::compile(&expr).unwrap();
+
+    // Should compile head, then tail, then Cons
+    assert!(chunk.instructions.contains(&Instruction::Cons));
+    assert!(chunk
+        .instructions
+        .iter()
+        .any(|i| matches!(i, Instruction::LoadConst(_))));
+}
+
+#[test]
+fn test_compile_cons_with_list() {
+    // 1 :: [2; 3]
+    let expr = Expr::Cons {
+        head: Box::new(Expr::Lit(Literal::Int(1))),
+        tail: Box::new(Expr::List(vec![
+            Expr::Lit(Literal::Int(2)),
+            Expr::Lit(Literal::Int(3)),
+        ])),
+    };
+    let chunk = Compiler::compile(&expr).unwrap();
+
+    assert!(chunk.instructions.contains(&Instruction::Cons));
+    assert!(chunk
+        .instructions
+        .iter()
+        .any(|i| matches!(i, Instruction::MakeList(2))));
+}
+
+#[test]
+fn test_compile_cons_nested() {
+    // 1 :: 2 :: []
+    let expr = Expr::Cons {
+        head: Box::new(Expr::Lit(Literal::Int(1))),
+        tail: Box::new(Expr::Cons {
+            head: Box::new(Expr::Lit(Literal::Int(2))),
+            tail: Box::new(Expr::List(vec![])),
+        }),
+    };
+    let chunk = Compiler::compile(&expr).unwrap();
+
+    // Should have two Cons instructions
+    let cons_count = chunk
+        .instructions
+        .iter()
+        .filter(|i| matches!(i, Instruction::Cons))
+        .count();
+    assert_eq!(cons_count, 2);
+}
+
+#[test]
+fn test_compile_list_nested() {
+    // [[1; 2]; [3; 4]]
+    let expr = Expr::List(vec![
+        Expr::List(vec![Expr::Lit(Literal::Int(1)), Expr::Lit(Literal::Int(2))]),
+        Expr::List(vec![Expr::Lit(Literal::Int(3)), Expr::Lit(Literal::Int(4))]),
+    ]);
+    let chunk = Compiler::compile(&expr).unwrap();
+
+    // Should have two inner MakeList(2) and one outer MakeList(2)
+    let make_list_count = chunk
+        .instructions
+        .iter()
+        .filter(|i| matches!(i, Instruction::MakeList(2)))
+        .count();
+    assert_eq!(make_list_count, 3);
+}
+
+#[test]
+fn test_compile_list_with_variables() {
+    // let x = 1 in let y = 2 in [x; y]
+    let expr = Expr::Let {
+        name: "x".to_string(),
+        value: Box::new(Expr::Lit(Literal::Int(1))),
+        body: Box::new(Expr::Let {
+            name: "y".to_string(),
+            value: Box::new(Expr::Lit(Literal::Int(2))),
+            body: Box::new(Expr::List(vec![
+                Expr::Var("x".to_string()),
+                Expr::Var("y".to_string()),
+            ])),
+        }),
+    };
+    let chunk = Compiler::compile(&expr).unwrap();
+
+    assert!(chunk.instructions.contains(&Instruction::LoadLocal(0)));
+    assert!(chunk.instructions.contains(&Instruction::LoadLocal(1)));
+    assert!(chunk
+        .instructions
+        .iter()
+        .any(|i| matches!(i, Instruction::MakeList(2))));
+}
+
+#[test]
+fn test_compile_list_with_expressions() {
+    // [1 + 2; 3 * 4]
+    let expr = Expr::List(vec![
+        Expr::BinOp {
+            op: BinOp::Add,
+            left: Box::new(Expr::Lit(Literal::Int(1))),
+            right: Box::new(Expr::Lit(Literal::Int(2))),
+        },
+        Expr::BinOp {
+            op: BinOp::Mul,
+            left: Box::new(Expr::Lit(Literal::Int(3))),
+            right: Box::new(Expr::Lit(Literal::Int(4))),
+        },
+    ]);
+    let chunk = Compiler::compile(&expr).unwrap();
+
+    assert!(chunk.instructions.contains(&Instruction::Add));
+    assert!(chunk.instructions.contains(&Instruction::Mul));
+    assert!(chunk
+        .instructions
+        .iter()
+        .any(|i| matches!(i, Instruction::MakeList(2))));
+}
+
+#[test]
+fn test_compile_list_in_let() {
+    // let xs = [1; 2; 3] in xs
+    let expr = Expr::Let {
+        name: "xs".to_string(),
+        value: Box::new(Expr::List(vec![
+            Expr::Lit(Literal::Int(1)),
+            Expr::Lit(Literal::Int(2)),
+            Expr::Lit(Literal::Int(3)),
+        ])),
+        body: Box::new(Expr::Var("xs".to_string())),
+    };
+    let chunk = Compiler::compile(&expr).unwrap();
+
+    assert!(chunk
+        .instructions
+        .iter()
+        .any(|i| matches!(i, Instruction::MakeList(3))));
+    assert!(chunk.instructions.contains(&Instruction::StoreLocal(0)));
+    assert!(chunk.instructions.contains(&Instruction::LoadLocal(0)));
+}
+
+#[test]
+fn test_compile_cons_with_variable() {
+    // let xs = [2; 3] in 1 :: xs
+    let expr = Expr::Let {
+        name: "xs".to_string(),
+        value: Box::new(Expr::List(vec![
+            Expr::Lit(Literal::Int(2)),
+            Expr::Lit(Literal::Int(3)),
+        ])),
+        body: Box::new(Expr::Cons {
+            head: Box::new(Expr::Lit(Literal::Int(1))),
+            tail: Box::new(Expr::Var("xs".to_string())),
+        }),
+    };
+    let chunk = Compiler::compile(&expr).unwrap();
+
+    assert!(chunk
+        .instructions
+        .iter()
+        .any(|i| matches!(i, Instruction::MakeList(2))));
+    assert!(chunk.instructions.contains(&Instruction::Cons));
+    assert!(chunk.instructions.contains(&Instruction::LoadLocal(0)));
+}
+
+#[test]
+fn test_compile_list_mixed_types() {
+    // [42; "hello"; true]
+    let expr = Expr::List(vec![
+        Expr::Lit(Literal::Int(42)),
+        Expr::Lit(Literal::Str("hello".to_string())),
+        Expr::Lit(Literal::Bool(true)),
+    ]);
+    let chunk = Compiler::compile(&expr).unwrap();
+
+    assert_eq!(chunk.constants[0], Value::Int(42));
+    assert_eq!(chunk.constants[1], Value::Str("hello".to_string()));
+    assert_eq!(chunk.constants[2], Value::Bool(true));
+    assert!(chunk
+        .instructions
+        .iter()
+        .any(|i| matches!(i, Instruction::MakeList(3))));
 }

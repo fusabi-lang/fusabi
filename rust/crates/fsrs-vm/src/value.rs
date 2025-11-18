@@ -16,6 +16,10 @@ pub enum Value {
     Unit,
     /// Tuple of values (e.g., (1, 2), (x, "hello", true))
     Tuple(Vec<Value>),
+    /// Cons cell for list construction (head :: tail)
+    Cons { head: Box<Value>, tail: Box<Value> },
+    /// Empty list []
+    Nil,
 }
 
 impl Value {
@@ -27,6 +31,8 @@ impl Value {
             Value::Str(_) => "string",
             Value::Unit => "unit",
             Value::Tuple(_) => "tuple",
+            Value::Cons { .. } => "list",
+            Value::Nil => "list",
         }
     }
 
@@ -66,9 +72,19 @@ impl Value {
         }
     }
 
+    /// Attempts to extract cons cell components
+    /// Returns Some((&Value, &Value)) if the value is Cons, None otherwise
+    pub fn as_cons(&self) -> Option<(&Value, &Value)> {
+        match self {
+            Value::Cons { head, tail } => Some((head, tail)),
+            _ => None,
+        }
+    }
+
     /// Checks if the value is "truthy" for conditional logic
     /// - Bool(false) and Unit are falsy
     /// - Int(0) is falsy
+    /// - Nil (empty list) is falsy
     /// - Everything else is truthy
     pub fn is_truthy(&self) -> bool {
         match self {
@@ -77,6 +93,8 @@ impl Value {
             Value::Str(s) => !s.is_empty(),
             Value::Unit => false,
             Value::Tuple(elements) => !elements.is_empty(),
+            Value::Cons { .. } => true,
+            Value::Nil => false,
         }
     }
 
@@ -88,6 +106,45 @@ impl Value {
     /// Checks if the value is a Tuple
     pub fn is_tuple(&self) -> bool {
         matches!(self, Value::Tuple(_))
+    }
+
+    /// Checks if the value is a Cons cell
+    pub fn is_cons(&self) -> bool {
+        matches!(self, Value::Cons { .. })
+    }
+
+    /// Checks if the value is Nil (empty list)
+    pub fn is_nil(&self) -> bool {
+        matches!(self, Value::Nil)
+    }
+
+    /// Convert a list to a vector of values
+    /// Returns None if the list is malformed (tail is not Nil or Cons)
+    pub fn list_to_vec(&self) -> Option<Vec<Value>> {
+        let mut result = Vec::new();
+        let mut current = self;
+
+        loop {
+            match current {
+                Value::Nil => return Some(result),
+                Value::Cons { head, tail } => {
+                    result.push((**head).clone());
+                    current = tail;
+                }
+                _ => return None, // Malformed list
+            }
+        }
+    }
+
+    /// Convert a vector of values to a cons list
+    pub fn vec_to_cons(elements: Vec<Value>) -> Value {
+        elements
+            .into_iter()
+            .rev()
+            .fold(Value::Nil, |acc, elem| Value::Cons {
+                head: Box::new(elem),
+                tail: Box::new(acc),
+            })
     }
 }
 
@@ -107,6 +164,31 @@ impl fmt::Display for Value {
                     write!(f, "{}", element)?;
                 }
                 write!(f, ")")
+            }
+            Value::Nil => write!(f, "[]"),
+            Value::Cons { .. } => {
+                // Pretty-print as [e1; e2; e3]
+                match self.list_to_vec() {
+                    Some(elements) => {
+                        write!(f, "[")?;
+                        for (i, element) in elements.iter().enumerate() {
+                            if i > 0 {
+                                write!(f, "; ")?;
+                            }
+                            write!(f, "{}", element)?;
+                        }
+                        write!(f, "]")
+                    }
+                    None => {
+                        // Fallback for malformed lists
+                        write!(
+                            f,
+                            "Cons({}, {})",
+                            self.as_cons().unwrap().0,
+                            self.as_cons().unwrap().1
+                        )
+                    }
+                }
             }
         }
     }
@@ -548,5 +630,287 @@ mod tests {
             Value::Int(5),
         ]);
         assert_eq!(format!("{}", val), "(1, 2, 3, 4, 5)");
+    }
+
+    // ========== List/Cons Tests (Layer 3) ==========
+
+    #[test]
+    fn test_value_nil_construction() {
+        let val = Value::Nil;
+        assert_eq!(val, Value::Nil);
+        assert!(val.is_nil());
+        assert!(!val.is_cons());
+    }
+
+    #[test]
+    fn test_value_cons_construction() {
+        let val = Value::Cons {
+            head: Box::new(Value::Int(1)),
+            tail: Box::new(Value::Nil),
+        };
+        assert!(val.is_cons());
+        assert!(!val.is_nil());
+    }
+
+    #[test]
+    fn test_type_name_nil() {
+        assert_eq!(Value::Nil.type_name(), "list");
+    }
+
+    #[test]
+    fn test_type_name_cons() {
+        let val = Value::Cons {
+            head: Box::new(Value::Int(1)),
+            tail: Box::new(Value::Nil),
+        };
+        assert_eq!(val.type_name(), "list");
+    }
+
+    #[test]
+    fn test_is_nil() {
+        assert!(Value::Nil.is_nil());
+        assert!(!Value::Int(0).is_nil());
+        assert!(!Value::Cons {
+            head: Box::new(Value::Int(1)),
+            tail: Box::new(Value::Nil),
+        }
+        .is_nil());
+    }
+
+    #[test]
+    fn test_is_cons() {
+        let val = Value::Cons {
+            head: Box::new(Value::Int(1)),
+            tail: Box::new(Value::Nil),
+        };
+        assert!(val.is_cons());
+        assert!(!Value::Nil.is_cons());
+        assert!(!Value::Int(42).is_cons());
+    }
+
+    #[test]
+    fn test_as_cons_success() {
+        let val = Value::Cons {
+            head: Box::new(Value::Int(42)),
+            tail: Box::new(Value::Nil),
+        };
+        let cons = val.as_cons();
+        assert!(cons.is_some());
+        let (head, tail) = cons.unwrap();
+        assert_eq!(head, &Value::Int(42));
+        assert_eq!(tail, &Value::Nil);
+    }
+
+    #[test]
+    fn test_as_cons_failure() {
+        assert_eq!(Value::Nil.as_cons(), None);
+        assert_eq!(Value::Int(42).as_cons(), None);
+        assert_eq!(Value::Bool(true).as_cons(), None);
+    }
+
+    #[test]
+    fn test_display_nil() {
+        assert_eq!(format!("{}", Value::Nil), "[]");
+    }
+
+    #[test]
+    fn test_display_cons_single() {
+        let val = Value::Cons {
+            head: Box::new(Value::Int(42)),
+            tail: Box::new(Value::Nil),
+        };
+        assert_eq!(format!("{}", val), "[42]");
+    }
+
+    #[test]
+    fn test_display_cons_multiple() {
+        let val = Value::Cons {
+            head: Box::new(Value::Int(1)),
+            tail: Box::new(Value::Cons {
+                head: Box::new(Value::Int(2)),
+                tail: Box::new(Value::Cons {
+                    head: Box::new(Value::Int(3)),
+                    tail: Box::new(Value::Nil),
+                }),
+            }),
+        };
+        assert_eq!(format!("{}", val), "[1; 2; 3]");
+    }
+
+    #[test]
+    fn test_list_to_vec_empty() {
+        let val = Value::Nil;
+        let vec = val.list_to_vec();
+        assert_eq!(vec, Some(vec![]));
+    }
+
+    #[test]
+    fn test_list_to_vec_single() {
+        let val = Value::Cons {
+            head: Box::new(Value::Int(42)),
+            tail: Box::new(Value::Nil),
+        };
+        let vec = val.list_to_vec();
+        assert_eq!(vec, Some(vec![Value::Int(42)]));
+    }
+
+    #[test]
+    fn test_list_to_vec_multiple() {
+        let val = Value::Cons {
+            head: Box::new(Value::Int(1)),
+            tail: Box::new(Value::Cons {
+                head: Box::new(Value::Int(2)),
+                tail: Box::new(Value::Cons {
+                    head: Box::new(Value::Int(3)),
+                    tail: Box::new(Value::Nil),
+                }),
+            }),
+        };
+        let vec = val.list_to_vec();
+        assert_eq!(vec, Some(vec![Value::Int(1), Value::Int(2), Value::Int(3)]));
+    }
+
+    #[test]
+    fn test_list_to_vec_malformed() {
+        // Malformed list: tail is not Nil or Cons
+        let val = Value::Cons {
+            head: Box::new(Value::Int(1)),
+            tail: Box::new(Value::Int(2)),
+        };
+        let vec = val.list_to_vec();
+        assert_eq!(vec, None);
+    }
+
+    #[test]
+    fn test_vec_to_cons_empty() {
+        let val = Value::vec_to_cons(vec![]);
+        assert_eq!(val, Value::Nil);
+    }
+
+    #[test]
+    fn test_vec_to_cons_single() {
+        let val = Value::vec_to_cons(vec![Value::Int(42)]);
+        assert_eq!(
+            val,
+            Value::Cons {
+                head: Box::new(Value::Int(42)),
+                tail: Box::new(Value::Nil),
+            }
+        );
+    }
+
+    #[test]
+    fn test_vec_to_cons_multiple() {
+        let val = Value::vec_to_cons(vec![Value::Int(1), Value::Int(2), Value::Int(3)]);
+        assert_eq!(
+            val,
+            Value::Cons {
+                head: Box::new(Value::Int(1)),
+                tail: Box::new(Value::Cons {
+                    head: Box::new(Value::Int(2)),
+                    tail: Box::new(Value::Cons {
+                        head: Box::new(Value::Int(3)),
+                        tail: Box::new(Value::Nil),
+                    }),
+                }),
+            }
+        );
+    }
+
+    #[test]
+    fn test_cons_structural_equality() {
+        let list1 = Value::Cons {
+            head: Box::new(Value::Int(1)),
+            tail: Box::new(Value::Cons {
+                head: Box::new(Value::Int(2)),
+                tail: Box::new(Value::Nil),
+            }),
+        };
+        let list2 = Value::Cons {
+            head: Box::new(Value::Int(1)),
+            tail: Box::new(Value::Cons {
+                head: Box::new(Value::Int(2)),
+                tail: Box::new(Value::Nil),
+            }),
+        };
+        assert_eq!(list1, list2);
+    }
+
+    #[test]
+    fn test_cons_inequality() {
+        let list1 = Value::Cons {
+            head: Box::new(Value::Int(1)),
+            tail: Box::new(Value::Nil),
+        };
+        let list2 = Value::Cons {
+            head: Box::new(Value::Int(2)),
+            tail: Box::new(Value::Nil),
+        };
+        assert_ne!(list1, list2);
+    }
+
+    #[test]
+    fn test_cons_nested_lists() {
+        // [[1; 2]; [3; 4]]
+        let inner1 = Value::vec_to_cons(vec![Value::Int(1), Value::Int(2)]);
+        let inner2 = Value::vec_to_cons(vec![Value::Int(3), Value::Int(4)]);
+        let outer = Value::vec_to_cons(vec![inner1, inner2]);
+        assert_eq!(format!("{}", outer), "[[1; 2]; [3; 4]]");
+    }
+
+    #[test]
+    fn test_is_truthy_nil() {
+        assert!(!Value::Nil.is_truthy());
+    }
+
+    #[test]
+    fn test_is_truthy_cons() {
+        let val = Value::Cons {
+            head: Box::new(Value::Int(1)),
+            tail: Box::new(Value::Nil),
+        };
+        assert!(val.is_truthy());
+    }
+
+    #[test]
+    fn test_clone_nil() {
+        let val1 = Value::Nil;
+        let val2 = val1.clone();
+        assert_eq!(val1, val2);
+    }
+
+    #[test]
+    fn test_clone_cons() {
+        let val1 = Value::Cons {
+            head: Box::new(Value::Int(42)),
+            tail: Box::new(Value::Nil),
+        };
+        let val2 = val1.clone();
+        assert_eq!(val1, val2);
+    }
+
+    #[test]
+    fn test_cons_roundtrip() {
+        // Test vec -> cons -> vec roundtrip
+        let original = vec![Value::Int(1), Value::Int(2), Value::Int(3)];
+        let cons = Value::vec_to_cons(original.clone());
+        let result = cons.list_to_vec().unwrap();
+        assert_eq!(original, result);
+    }
+
+    #[test]
+    fn test_debug_nil() {
+        assert_eq!(format!("{:?}", Value::Nil), "Nil");
+    }
+
+    #[test]
+    fn test_debug_cons() {
+        let val = Value::Cons {
+            head: Box::new(Value::Int(42)),
+            tail: Box::new(Value::Nil),
+        };
+        let debug_str = format!("{:?}", val);
+        assert!(debug_str.contains("Cons"));
+        assert!(debug_str.contains("Int(42)"));
     }
 }

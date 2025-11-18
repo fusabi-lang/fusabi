@@ -8,6 +8,7 @@
 //! - Identifiers: alphanumeric names starting with letter or underscore
 //! - Operators: arithmetic, comparison, logical, cons (::)
 //! - Punctuation: parentheses, arrows, commas, brackets, semicolons
+//! - Array syntax: [|, |], <-, .
 //! - Position tracking for error reporting
 //!
 //! # Example
@@ -87,6 +88,8 @@ pub enum Token {
     Or,
     /// :: operator (cons)
     ColonColon,
+    /// <- operator (array assignment)
+    LArrow,
 
     // Punctuation
     /// ( left parenthesis
@@ -97,12 +100,18 @@ pub enum Token {
     LBracket,
     /// ] right bracket
     RBracket,
+    /// [| left array bracket
+    LBracketPipe,
+    /// |] right array bracket
+    PipeRBracket,
     /// -> arrow
     Arrow,
     /// , comma
     Comma,
     /// ; semicolon
     Semicolon,
+    /// . dot
+    Dot,
 
     // Special
     /// End of file marker
@@ -139,13 +148,17 @@ impl fmt::Display for Token {
             Token::And => write!(f, "&&"),
             Token::Or => write!(f, "||"),
             Token::ColonColon => write!(f, "::"),
+            Token::LArrow => write!(f, "<-"),
             Token::LParen => write!(f, "("),
             Token::RParen => write!(f, ")"),
             Token::LBracket => write!(f, "["),
             Token::RBracket => write!(f, "]"),
+            Token::LBracketPipe => write!(f, "[|"),
+            Token::PipeRBracket => write!(f, "|]"),
             Token::Arrow => write!(f, "->"),
             Token::Comma => write!(f, ","),
             Token::Semicolon => write!(f, ";"),
+            Token::Dot => write!(f, "."),
             Token::Eof => write!(f, "EOF"),
         }
     }
@@ -291,10 +304,10 @@ impl Lexer {
                 Ok(Token::Slash)
             }
             '=' => self.lex_eq_or_eqeq(),
-            '<' => self.lex_lt_or_lte_or_neq(),
+            '<' => self.lex_lt_or_lte_or_neq_or_larrow(),
             '>' => self.lex_gt_or_gte(),
             '&' => self.lex_and(),
-            '|' => self.lex_or(),
+            '|' => self.lex_or_or_pipe_rbracket(),
             ':' => self.lex_colon_or_coloncolon(),
             '(' => {
                 self.advance();
@@ -304,10 +317,7 @@ impl Lexer {
                 self.advance();
                 Ok(Token::RParen)
             }
-            '[' => {
-                self.advance();
-                Ok(Token::LBracket)
-            }
+            '[' => self.lex_lbracket_or_lbracket_pipe(),
             ']' => {
                 self.advance();
                 Ok(Token::RBracket)
@@ -319,6 +329,10 @@ impl Lexer {
             ';' => {
                 self.advance();
                 Ok(Token::Semicolon)
+            }
+            '.' => {
+                self.advance();
+                Ok(Token::Dot)
             }
             _ => Err(LexError::UnexpectedChar(ch, self.current_position())),
         }
@@ -444,8 +458,8 @@ impl Lexer {
         }
     }
 
-    /// Lex <, <=, or <>.
-    fn lex_lt_or_lte_or_neq(&mut self) -> Result<Token, LexError> {
+    /// Lex <, <=, <>, or <-.
+    fn lex_lt_or_lte_or_neq_or_larrow(&mut self) -> Result<Token, LexError> {
         self.advance();
         if !self.is_at_end() {
             match self.current_char() {
@@ -456,6 +470,10 @@ impl Lexer {
                 '>' => {
                     self.advance();
                     Ok(Token::Neq)
+                }
+                '-' => {
+                    self.advance();
+                    Ok(Token::LArrow)
                 }
                 _ => Ok(Token::Lt),
             }
@@ -487,13 +505,22 @@ impl Lexer {
         }
     }
 
-    /// Lex ||.
-    fn lex_or(&mut self) -> Result<Token, LexError> {
+    /// Lex || or |].
+    fn lex_or_or_pipe_rbracket(&mut self) -> Result<Token, LexError> {
         let pos = self.current_position();
         self.advance();
-        if !self.is_at_end() && self.current_char() == '|' {
-            self.advance();
-            Ok(Token::Or)
+        if !self.is_at_end() {
+            match self.current_char() {
+                '|' => {
+                    self.advance();
+                    Ok(Token::Or)
+                }
+                ']' => {
+                    self.advance();
+                    Ok(Token::PipeRBracket)
+                }
+                _ => Err(LexError::UnexpectedChar('|', pos)),
+            }
         } else {
             Err(LexError::UnexpectedChar('|', pos))
         }
@@ -509,6 +536,17 @@ impl Lexer {
         } else {
             // Single colon is not a valid token in our language
             Err(LexError::UnexpectedChar(':', pos))
+        }
+    }
+
+    /// Lex [ or [|.
+    fn lex_lbracket_or_lbracket_pipe(&mut self) -> Result<Token, LexError> {
+        self.advance();
+        if !self.is_at_end() && self.current_char() == '|' {
+            self.advance();
+            Ok(Token::LBracketPipe)
+        } else {
+            Ok(Token::LBracket)
         }
     }
 
@@ -1330,5 +1368,136 @@ mod tests {
             LexError::UnexpectedChar(ch, _) => assert_eq!(ch, ':'),
             _ => panic!("Expected UnexpectedChar error for single colon"),
         }
+    }
+
+    // ========================================================================
+    // Array Lexer Tests (Issue #26 Layer 1)
+    // ========================================================================
+
+    #[test]
+    fn test_lex_array_brackets() {
+        let mut lexer = Lexer::new("[| |]");
+        let tokens = lexer.tokenize().unwrap();
+        assert_eq!(tokens[0].token, Token::LBracketPipe);
+        assert_eq!(tokens[1].token, Token::PipeRBracket);
+    }
+
+    #[test]
+    fn test_lex_array_empty() {
+        let mut lexer = Lexer::new("[||]");
+        let tokens = lexer.tokenize().unwrap();
+        assert_eq!(tokens[0].token, Token::LBracketPipe);
+        assert_eq!(tokens[1].token, Token::PipeRBracket);
+    }
+
+    #[test]
+    fn test_lex_array_simple() {
+        let mut lexer = Lexer::new("[|1; 2; 3|]");
+        let tokens = lexer.tokenize().unwrap();
+        assert_eq!(tokens[0].token, Token::LBracketPipe);
+        assert_eq!(tokens[1].token, Token::Int(1));
+        assert_eq!(tokens[2].token, Token::Semicolon);
+        assert_eq!(tokens[3].token, Token::Int(2));
+        assert_eq!(tokens[4].token, Token::Semicolon);
+        assert_eq!(tokens[5].token, Token::Int(3));
+        assert_eq!(tokens[6].token, Token::PipeRBracket);
+    }
+
+    #[test]
+    fn test_lex_array_single_element() {
+        let mut lexer = Lexer::new("[|42|]");
+        let tokens = lexer.tokenize().unwrap();
+        assert_eq!(tokens[0].token, Token::LBracketPipe);
+        assert_eq!(tokens[1].token, Token::Int(42));
+        assert_eq!(tokens[2].token, Token::PipeRBracket);
+    }
+
+    #[test]
+    fn test_lex_array_index() {
+        let mut lexer = Lexer::new("arr.[0]");
+        let tokens = lexer.tokenize().unwrap();
+        assert_eq!(tokens[0].token, Token::Ident("arr".to_string()));
+        assert_eq!(tokens[1].token, Token::Dot);
+        assert_eq!(tokens[2].token, Token::LBracket);
+        assert_eq!(tokens[3].token, Token::Int(0));
+        assert_eq!(tokens[4].token, Token::RBracket);
+    }
+
+    #[test]
+    fn test_lex_array_update() {
+        let mut lexer = Lexer::new("arr.[0] <- 99");
+        let tokens = lexer.tokenize().unwrap();
+        assert_eq!(tokens[0].token, Token::Ident("arr".to_string()));
+        assert_eq!(tokens[1].token, Token::Dot);
+        assert_eq!(tokens[2].token, Token::LBracket);
+        assert_eq!(tokens[3].token, Token::Int(0));
+        assert_eq!(tokens[4].token, Token::RBracket);
+        assert_eq!(tokens[5].token, Token::LArrow);
+        assert_eq!(tokens[6].token, Token::Int(99));
+    }
+
+    #[test]
+    fn test_lex_larrow_operator() {
+        let mut lexer = Lexer::new("<-");
+        let tokens = lexer.tokenize().unwrap();
+        assert_eq!(tokens[0].token, Token::LArrow);
+    }
+
+    #[test]
+    fn test_lex_dot_operator() {
+        let mut lexer = Lexer::new(".");
+        let tokens = lexer.tokenize().unwrap();
+        assert_eq!(tokens[0].token, Token::Dot);
+    }
+
+    #[test]
+    fn test_lex_disambiguation_array_vs_list() {
+        let mut lexer = Lexer::new("[| [");
+        let tokens = lexer.tokenize().unwrap();
+        assert_eq!(tokens[0].token, Token::LBracketPipe);
+        assert_eq!(tokens[1].token, Token::LBracket);
+    }
+
+    #[test]
+    fn test_lex_disambiguation_pipe_rbracket_vs_or() {
+        let mut lexer = Lexer::new("|] ||");
+        let tokens = lexer.tokenize().unwrap();
+        assert_eq!(tokens[0].token, Token::PipeRBracket);
+        assert_eq!(tokens[1].token, Token::Or);
+    }
+
+    #[test]
+    fn test_lex_disambiguation_larrow_vs_lt() {
+        let mut lexer = Lexer::new("<- <");
+        let tokens = lexer.tokenize().unwrap();
+        assert_eq!(tokens[0].token, Token::LArrow);
+        assert_eq!(tokens[1].token, Token::Lt);
+    }
+
+    #[test]
+    fn test_lex_nested_arrays() {
+        let mut lexer = Lexer::new("[|[|1|]; [|2|]|]");
+        let tokens = lexer.tokenize().unwrap();
+        assert_eq!(tokens[0].token, Token::LBracketPipe);
+        assert_eq!(tokens[1].token, Token::LBracketPipe);
+        assert_eq!(tokens[2].token, Token::Int(1));
+        assert_eq!(tokens[3].token, Token::PipeRBracket);
+        assert_eq!(tokens[4].token, Token::Semicolon);
+        assert_eq!(tokens[5].token, Token::LBracketPipe);
+        assert_eq!(tokens[6].token, Token::Int(2));
+        assert_eq!(tokens[7].token, Token::PipeRBracket);
+        assert_eq!(tokens[8].token, Token::PipeRBracket);
+    }
+
+    #[test]
+    fn test_lex_array_mixed_with_list() {
+        let mut lexer = Lexer::new("[|1|] [1]");
+        let tokens = lexer.tokenize().unwrap();
+        assert_eq!(tokens[0].token, Token::LBracketPipe);
+        assert_eq!(tokens[1].token, Token::Int(1));
+        assert_eq!(tokens[2].token, Token::PipeRBracket);
+        assert_eq!(tokens[3].token, Token::LBracket);
+        assert_eq!(tokens[4].token, Token::Int(1));
+        assert_eq!(tokens[5].token, Token::RBracket);
     }
 }

@@ -14,6 +14,7 @@
 //! - Conditional expressions (if-then-else)
 //! - Tuples (e.g., (1, 2), (x, y, z))
 //! - Lists (e.g., [1; 2; 3], []) and cons operator (::)
+//! - Arrays (e.g., [|1; 2; 3|], arr.[0], arr.[0] <- 99)
 //!
 //! # Example
 //!
@@ -199,6 +200,22 @@ pub enum Expr {
 
     /// Cons operator (e.g., 1 :: [2; 3], x :: xs)
     Cons { head: Box<Expr>, tail: Box<Expr> },
+
+    /// Array literal (e.g., [|1; 2; 3|], [||])
+    Array(Vec<Expr>),
+
+    /// Array indexing (e.g., arr.[0], arr.[i])
+    ArrayIndex { array: Box<Expr>, index: Box<Expr> },
+
+    /// Array update (e.g., arr.[0] <- 99) - immutable, returns new array
+    ArrayUpdate {
+        array: Box<Expr>,
+        index: Box<Expr>,
+        value: Box<Expr>,
+    },
+
+    /// Array length (e.g., Array.length arr)
+    ArrayLength(Box<Expr>),
 }
 
 impl Expr {
@@ -262,6 +279,16 @@ impl Expr {
         matches!(self, Expr::Cons { .. })
     }
 
+    /// Returns true if this expression is an array.
+    pub fn is_array(&self) -> bool {
+        matches!(self, Expr::Array(_))
+    }
+
+    /// Returns true if this expression is an array index.
+    pub fn is_array_index(&self) -> bool {
+        matches!(self, Expr::ArrayIndex { .. })
+    }
+
     /// Returns the variable name if this is a Var, otherwise None.
     pub fn as_var(&self) -> Option<&str> {
         match self {
@@ -298,6 +325,14 @@ impl Expr {
     pub fn as_cons(&self) -> Option<(&Expr, &Expr)> {
         match self {
             Expr::Cons { head, tail } => Some((head, tail)),
+            _ => None,
+        }
+    }
+
+    /// Returns the array elements if this is an Array, otherwise None.
+    pub fn as_array(&self) -> Option<&Vec<Expr>> {
+        match self {
+            Expr::Array(elements) => Some(elements),
             _ => None,
         }
     }
@@ -362,6 +397,29 @@ impl fmt::Display for Expr {
             }
             Expr::Cons { head, tail } => {
                 write!(f, "({} :: {})", head, tail)
+            }
+            Expr::Array(elements) => {
+                write!(f, "[|")?;
+                for (i, element) in elements.iter().enumerate() {
+                    if i > 0 {
+                        write!(f, "; ")?;
+                    }
+                    write!(f, "{}", element)?;
+                }
+                write!(f, "|]")
+            }
+            Expr::ArrayIndex { array, index } => {
+                write!(f, "({}.[{}])", array, index)
+            }
+            Expr::ArrayUpdate {
+                array,
+                index,
+                value,
+            } => {
+                write!(f, "({}.[{}] <- {})", array, index, value)
+            }
+            Expr::ArrayLength(arr) => {
+                write!(f, "(Array.length {})", arr)
             }
         }
     }
@@ -1072,5 +1130,236 @@ mod tests {
         };
         let expr2 = expr1.clone();
         assert_eq!(expr1, expr2);
+    }
+
+    // ========================================================================
+    // Array Tests (Issue #26 Layer 1)
+    // ========================================================================
+
+    #[test]
+    fn test_array_empty() {
+        // [||]
+        let expr = Expr::Array(vec![]);
+        assert!(expr.is_array());
+        assert!(!expr.is_list());
+        assert!(!expr.is_literal());
+        assert_eq!(format!("{}", expr), "[||]");
+    }
+
+    #[test]
+    fn test_array_single_element() {
+        // [|42|]
+        let expr = Expr::Array(vec![Expr::Lit(Literal::Int(42))]);
+        assert!(expr.is_array());
+        assert_eq!(format!("{}", expr), "[|42|]");
+    }
+
+    #[test]
+    fn test_array_multiple_elements() {
+        // [|1; 2; 3|]
+        let expr = Expr::Array(vec![
+            Expr::Lit(Literal::Int(1)),
+            Expr::Lit(Literal::Int(2)),
+            Expr::Lit(Literal::Int(3)),
+        ]);
+        assert!(expr.is_array());
+        assert_eq!(format!("{}", expr), "[|1; 2; 3|]");
+    }
+
+    #[test]
+    fn test_array_nested() {
+        // [|[|1|]; [|2|]|]
+        let expr = Expr::Array(vec![
+            Expr::Array(vec![Expr::Lit(Literal::Int(1))]),
+            Expr::Array(vec![Expr::Lit(Literal::Int(2))]),
+        ]);
+        assert!(expr.is_array());
+        assert_eq!(format!("{}", expr), "[|[|1|]; [|2|]|]");
+    }
+
+    #[test]
+    fn test_array_nested_deep() {
+        // [|[|1; 2|]; [|3; 4|]|]
+        let expr = Expr::Array(vec![
+            Expr::Array(vec![Expr::Lit(Literal::Int(1)), Expr::Lit(Literal::Int(2))]),
+            Expr::Array(vec![Expr::Lit(Literal::Int(3)), Expr::Lit(Literal::Int(4))]),
+        ]);
+        assert!(expr.is_array());
+        assert_eq!(format!("{}", expr), "[|[|1; 2|]; [|3; 4|]|]");
+    }
+
+    #[test]
+    fn test_array_with_variables() {
+        // [|x; y; z|]
+        let expr = Expr::Array(vec![
+            Expr::Var("x".to_string()),
+            Expr::Var("y".to_string()),
+            Expr::Var("z".to_string()),
+        ]);
+        assert!(expr.is_array());
+        assert_eq!(format!("{}", expr), "[|x; y; z|]");
+    }
+
+    #[test]
+    fn test_array_with_expressions() {
+        // [|x + 1; y * 2|]
+        let expr = Expr::Array(vec![
+            Expr::BinOp {
+                op: BinOp::Add,
+                left: Box::new(Expr::Var("x".to_string())),
+                right: Box::new(Expr::Lit(Literal::Int(1))),
+            },
+            Expr::BinOp {
+                op: BinOp::Mul,
+                left: Box::new(Expr::Var("y".to_string())),
+                right: Box::new(Expr::Lit(Literal::Int(2))),
+            },
+        ]);
+        assert!(expr.is_array());
+        assert_eq!(format!("{}", expr), "[|(x + 1); (y * 2)|]");
+    }
+
+    #[test]
+    fn test_array_as_array() {
+        // Test as_array() helper
+        let expr = Expr::Array(vec![Expr::Lit(Literal::Int(1)), Expr::Lit(Literal::Int(2))]);
+        let elements = expr.as_array();
+        assert!(elements.is_some());
+        assert_eq!(elements.unwrap().len(), 2);
+    }
+
+    #[test]
+    fn test_array_as_array_none() {
+        // Non-array should return None
+        let expr = Expr::List(vec![]);
+        assert_eq!(expr.as_array(), None);
+    }
+
+    #[test]
+    fn test_array_index_simple() {
+        // arr.[0]
+        let expr = Expr::ArrayIndex {
+            array: Box::new(Expr::Var("arr".to_string())),
+            index: Box::new(Expr::Lit(Literal::Int(0))),
+        };
+        assert!(expr.is_array_index());
+        assert!(!expr.is_array());
+        assert_eq!(format!("{}", expr), "(arr.[0])");
+    }
+
+    #[test]
+    fn test_array_index_variable_index() {
+        // arr.[i]
+        let expr = Expr::ArrayIndex {
+            array: Box::new(Expr::Var("arr".to_string())),
+            index: Box::new(Expr::Var("i".to_string())),
+        };
+        assert!(expr.is_array_index());
+        assert_eq!(format!("{}", expr), "(arr.[i])");
+    }
+
+    #[test]
+    fn test_array_index_nested() {
+        // arr.[i + 1]
+        let expr = Expr::ArrayIndex {
+            array: Box::new(Expr::Var("arr".to_string())),
+            index: Box::new(Expr::BinOp {
+                op: BinOp::Add,
+                left: Box::new(Expr::Var("i".to_string())),
+                right: Box::new(Expr::Lit(Literal::Int(1))),
+            }),
+        };
+        assert!(expr.is_array_index());
+        assert_eq!(format!("{}", expr), "(arr.[(i + 1)])");
+    }
+
+    #[test]
+    fn test_array_update_simple() {
+        // arr.[0] <- 99
+        let expr = Expr::ArrayUpdate {
+            array: Box::new(Expr::Var("arr".to_string())),
+            index: Box::new(Expr::Lit(Literal::Int(0))),
+            value: Box::new(Expr::Lit(Literal::Int(99))),
+        };
+        assert_eq!(format!("{}", expr), "(arr.[0] <- 99)");
+    }
+
+    #[test]
+    fn test_array_update_with_expression() {
+        // arr.[i] <- x + 1
+        let expr = Expr::ArrayUpdate {
+            array: Box::new(Expr::Var("arr".to_string())),
+            index: Box::new(Expr::Var("i".to_string())),
+            value: Box::new(Expr::BinOp {
+                op: BinOp::Add,
+                left: Box::new(Expr::Var("x".to_string())),
+                right: Box::new(Expr::Lit(Literal::Int(1))),
+            }),
+        };
+        assert_eq!(format!("{}", expr), "(arr.[i] <- (x + 1))");
+    }
+
+    #[test]
+    fn test_array_length_simple() {
+        // Array.length arr
+        let expr = Expr::ArrayLength(Box::new(Expr::Var("arr".to_string())));
+        assert_eq!(format!("{}", expr), "(Array.length arr)");
+    }
+
+    #[test]
+    fn test_array_length_with_literal() {
+        // Array.length [|1; 2; 3|]
+        let expr = Expr::ArrayLength(Box::new(Expr::Array(vec![
+            Expr::Lit(Literal::Int(1)),
+            Expr::Lit(Literal::Int(2)),
+            Expr::Lit(Literal::Int(3)),
+        ])));
+        assert_eq!(format!("{}", expr), "(Array.length [|1; 2; 3|])");
+    }
+
+    #[test]
+    fn test_array_clone_and_equality() {
+        let expr1 = Expr::Array(vec![Expr::Lit(Literal::Int(1)), Expr::Lit(Literal::Int(2))]);
+        let expr2 = expr1.clone();
+        assert_eq!(expr1, expr2);
+    }
+
+    #[test]
+    fn test_array_index_clone_and_equality() {
+        let expr1 = Expr::ArrayIndex {
+            array: Box::new(Expr::Var("arr".to_string())),
+            index: Box::new(Expr::Lit(Literal::Int(0))),
+        };
+        let expr2 = expr1.clone();
+        assert_eq!(expr1, expr2);
+    }
+
+    #[test]
+    fn test_array_mixed_types() {
+        // [|1; "hello"; true|] (would be type error at runtime, but valid AST)
+        let expr = Expr::Array(vec![
+            Expr::Lit(Literal::Int(1)),
+            Expr::Lit(Literal::Str("hello".to_string())),
+            Expr::Lit(Literal::Bool(true)),
+        ]);
+        assert!(expr.is_array());
+        assert_eq!(format!("{}", expr), r#"[|1; "hello"; true|]"#);
+    }
+
+    #[test]
+    fn test_array_large() {
+        // [|1; 2; 3; 4; 5; 6; 7; 8|]
+        let expr = Expr::Array(vec![
+            Expr::Lit(Literal::Int(1)),
+            Expr::Lit(Literal::Int(2)),
+            Expr::Lit(Literal::Int(3)),
+            Expr::Lit(Literal::Int(4)),
+            Expr::Lit(Literal::Int(5)),
+            Expr::Lit(Literal::Int(6)),
+            Expr::Lit(Literal::Int(7)),
+            Expr::Lit(Literal::Int(8)),
+        ]);
+        assert!(expr.is_array());
+        assert_eq!(format!("{}", expr), "[|1; 2; 3; 4; 5; 6; 7; 8|]");
     }
 }

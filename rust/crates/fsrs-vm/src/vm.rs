@@ -28,6 +28,8 @@ pub enum VmError {
     CallStackOverflow,
     /// No active frame
     NoActiveFrame,
+    /// Invalid tuple field index
+    InvalidTupleFieldIndex { index: u8, tuple_size: usize },
 }
 
 impl fmt::Display for VmError {
@@ -45,6 +47,13 @@ impl fmt::Display for VmError {
             }
             VmError::CallStackOverflow => write!(f, "Call stack overflow"),
             VmError::NoActiveFrame => write!(f, "No active frame"),
+            VmError::InvalidTupleFieldIndex { index, tuple_size } => {
+                write!(
+                    f,
+                    "Invalid tuple field index: {} (tuple size: {})",
+                    index, tuple_size
+                )
+            }
         }
     }
 }
@@ -233,6 +242,40 @@ impl Vm {
                     let condition = self.pop()?;
                     if !condition.is_truthy() {
                         self.jump(offset)?;
+                    }
+                }
+
+                // Tuple operations
+                Instruction::MakeTuple(n) => {
+                    // Pop N values from stack in reverse order (last pushed is last in tuple)
+                    let mut elements = Vec::with_capacity(n as usize);
+                    for _ in 0..n {
+                        elements.push(self.pop()?);
+                    }
+                    // Reverse to maintain left-to-right order
+                    elements.reverse();
+                    self.push(Value::Tuple(elements));
+                }
+
+                Instruction::GetTupleField(idx) => {
+                    let value = self.pop()?;
+                    match value.as_tuple() {
+                        Some(elements) => {
+                            let index = idx as usize;
+                            if index >= elements.len() {
+                                return Err(VmError::InvalidTupleFieldIndex {
+                                    index: idx,
+                                    tuple_size: elements.len(),
+                                });
+                            }
+                            self.push(elements[index].clone());
+                        }
+                        None => {
+                            return Err(VmError::TypeMismatch {
+                                expected: "tuple",
+                                got: value.type_name(),
+                            });
+                        }
                     }
                 }
 
@@ -629,5 +672,279 @@ mod tests {
                 got: "bool"
             })
         ));
+    }
+
+    // ========== Tuple Tests ==========
+
+    #[test]
+    fn test_vm_make_tuple_empty() {
+        let mut vm = Vm::new();
+        let chunk = ChunkBuilder::new()
+            .instruction(Instruction::MakeTuple(0))
+            .instruction(Instruction::Return)
+            .build();
+        let result = vm.execute(chunk).unwrap();
+        assert_eq!(result, Value::Tuple(vec![]));
+    }
+
+    #[test]
+    fn test_vm_make_tuple_pair() {
+        let mut vm = Vm::new();
+        let chunk = ChunkBuilder::new()
+            .constant(Value::Int(1))
+            .constant(Value::Int(2))
+            .instruction(Instruction::LoadConst(0))
+            .instruction(Instruction::LoadConst(1))
+            .instruction(Instruction::MakeTuple(2))
+            .instruction(Instruction::Return)
+            .build();
+        let result = vm.execute(chunk).unwrap();
+        assert_eq!(result, Value::Tuple(vec![Value::Int(1), Value::Int(2)]));
+    }
+
+    #[test]
+    fn test_vm_make_tuple_triple() {
+        let mut vm = Vm::new();
+        let chunk = ChunkBuilder::new()
+            .constant(Value::Int(1))
+            .constant(Value::Int(2))
+            .constant(Value::Int(3))
+            .instruction(Instruction::LoadConst(0))
+            .instruction(Instruction::LoadConst(1))
+            .instruction(Instruction::LoadConst(2))
+            .instruction(Instruction::MakeTuple(3))
+            .instruction(Instruction::Return)
+            .build();
+        let result = vm.execute(chunk).unwrap();
+        assert_eq!(
+            result,
+            Value::Tuple(vec![Value::Int(1), Value::Int(2), Value::Int(3)])
+        );
+    }
+
+    #[test]
+    fn test_vm_make_tuple_mixed_types() {
+        let mut vm = Vm::new();
+        let chunk = ChunkBuilder::new()
+            .constant(Value::Int(42))
+            .constant(Value::Str("hello".to_string()))
+            .constant(Value::Bool(true))
+            .instruction(Instruction::LoadConst(0))
+            .instruction(Instruction::LoadConst(1))
+            .instruction(Instruction::LoadConst(2))
+            .instruction(Instruction::MakeTuple(3))
+            .instruction(Instruction::Return)
+            .build();
+        let result = vm.execute(chunk).unwrap();
+        assert_eq!(
+            result,
+            Value::Tuple(vec![
+                Value::Int(42),
+                Value::Str("hello".to_string()),
+                Value::Bool(true)
+            ])
+        );
+    }
+
+    #[test]
+    fn test_vm_make_tuple_nested() {
+        let mut vm = Vm::new();
+        let chunk = ChunkBuilder::new()
+            .constant(Value::Int(1))
+            .constant(Value::Int(2))
+            .constant(Value::Int(3))
+            .instruction(Instruction::LoadConst(0))
+            .instruction(Instruction::LoadConst(1))
+            .instruction(Instruction::LoadConst(2))
+            .instruction(Instruction::MakeTuple(2))
+            .instruction(Instruction::MakeTuple(2))
+            .instruction(Instruction::Return)
+            .build();
+        let result = vm.execute(chunk).unwrap();
+        assert_eq!(
+            result,
+            Value::Tuple(vec![
+                Value::Int(1),
+                Value::Tuple(vec![Value::Int(2), Value::Int(3)])
+            ])
+        );
+    }
+
+    #[test]
+    fn test_vm_get_tuple_field() {
+        let mut vm = Vm::new();
+        let chunk = ChunkBuilder::new()
+            .constant(Value::Int(1))
+            .constant(Value::Int(2))
+            .instruction(Instruction::LoadConst(0))
+            .instruction(Instruction::LoadConst(1))
+            .instruction(Instruction::MakeTuple(2))
+            .instruction(Instruction::GetTupleField(0))
+            .instruction(Instruction::Return)
+            .build();
+        let result = vm.execute(chunk).unwrap();
+        assert_eq!(result, Value::Int(1));
+    }
+
+    #[test]
+    fn test_vm_get_tuple_field_second() {
+        let mut vm = Vm::new();
+        let chunk = ChunkBuilder::new()
+            .constant(Value::Int(1))
+            .constant(Value::Int(2))
+            .instruction(Instruction::LoadConst(0))
+            .instruction(Instruction::LoadConst(1))
+            .instruction(Instruction::MakeTuple(2))
+            .instruction(Instruction::GetTupleField(1))
+            .instruction(Instruction::Return)
+            .build();
+        let result = vm.execute(chunk).unwrap();
+        assert_eq!(result, Value::Int(2));
+    }
+
+    #[test]
+    fn test_vm_get_tuple_field_invalid_index() {
+        let mut vm = Vm::new();
+        let chunk = ChunkBuilder::new()
+            .constant(Value::Int(1))
+            .constant(Value::Int(2))
+            .instruction(Instruction::LoadConst(0))
+            .instruction(Instruction::LoadConst(1))
+            .instruction(Instruction::MakeTuple(2))
+            .instruction(Instruction::GetTupleField(5))
+            .instruction(Instruction::Return)
+            .build();
+        let result = vm.execute(chunk);
+        assert!(matches!(
+            result,
+            Err(VmError::InvalidTupleFieldIndex {
+                index: 5,
+                tuple_size: 2
+            })
+        ));
+    }
+
+    #[test]
+    fn test_vm_get_tuple_field_type_mismatch() {
+        let mut vm = Vm::new();
+        let chunk = ChunkBuilder::new()
+            .constant(Value::Int(42))
+            .instruction(Instruction::LoadConst(0))
+            .instruction(Instruction::GetTupleField(0))
+            .instruction(Instruction::Return)
+            .build();
+        let result = vm.execute(chunk);
+        assert!(matches!(
+            result,
+            Err(VmError::TypeMismatch {
+                expected: "tuple",
+                got: "int"
+            })
+        ));
+    }
+
+    #[test]
+    fn test_vm_tuple_eq() {
+        let mut vm = Vm::new();
+        let chunk = ChunkBuilder::new()
+            .constant(Value::Int(1))
+            .constant(Value::Int(2))
+            .instruction(Instruction::LoadConst(0))
+            .instruction(Instruction::LoadConst(1))
+            .instruction(Instruction::MakeTuple(2))
+            .instruction(Instruction::LoadConst(0))
+            .instruction(Instruction::LoadConst(1))
+            .instruction(Instruction::MakeTuple(2))
+            .instruction(Instruction::Eq)
+            .instruction(Instruction::Return)
+            .build();
+        let result = vm.execute(chunk).unwrap();
+        assert_eq!(result, Value::Bool(true));
+    }
+
+    #[test]
+    fn test_vm_tuple_neq() {
+        let mut vm = Vm::new();
+        let chunk = ChunkBuilder::new()
+            .constant(Value::Int(1))
+            .constant(Value::Int(2))
+            .constant(Value::Int(3))
+            .instruction(Instruction::LoadConst(0))
+            .instruction(Instruction::LoadConst(1))
+            .instruction(Instruction::MakeTuple(2))
+            .instruction(Instruction::LoadConst(0))
+            .instruction(Instruction::LoadConst(2))
+            .instruction(Instruction::MakeTuple(2))
+            .instruction(Instruction::Neq)
+            .instruction(Instruction::Return)
+            .build();
+        let result = vm.execute(chunk).unwrap();
+        assert_eq!(result, Value::Bool(true));
+    }
+
+    #[test]
+    fn test_vm_tuple_in_local() {
+        let mut vm = Vm::new();
+        let chunk = ChunkBuilder::new()
+            .constant(Value::Int(1))
+            .constant(Value::Int(2))
+            .instruction(Instruction::LoadConst(0))
+            .instruction(Instruction::LoadConst(1))
+            .instruction(Instruction::MakeTuple(2))
+            .instruction(Instruction::StoreLocal(0))
+            .instruction(Instruction::LoadLocal(0))
+            .instruction(Instruction::Return)
+            .build();
+        let result = vm.execute(chunk).unwrap();
+        assert_eq!(result, Value::Tuple(vec![Value::Int(1), Value::Int(2)]));
+    }
+
+    #[test]
+    fn test_vm_tuple_large() {
+        let mut vm = Vm::new();
+        let mut builder = ChunkBuilder::new();
+        for i in 1..=8 {
+            builder = builder.constant(Value::Int(i));
+        }
+        for i in 0..8 {
+            builder = builder.instruction(Instruction::LoadConst(i));
+        }
+        let chunk = builder
+            .instruction(Instruction::MakeTuple(8))
+            .instruction(Instruction::Return)
+            .build();
+        let result = vm.execute(chunk).unwrap();
+        let expected = Value::Tuple(vec![
+            Value::Int(1),
+            Value::Int(2),
+            Value::Int(3),
+            Value::Int(4),
+            Value::Int(5),
+            Value::Int(6),
+            Value::Int(7),
+            Value::Int(8),
+        ]);
+        assert_eq!(result, expected);
+    }
+
+    #[test]
+    fn test_vm_tuple_field_extraction_chain() {
+        // Create ((1, 2), 3), extract outer[0], then inner[1]
+        let mut vm = Vm::new();
+        let chunk = ChunkBuilder::new()
+            .constant(Value::Int(1))
+            .constant(Value::Int(2))
+            .constant(Value::Int(3))
+            .instruction(Instruction::LoadConst(0))
+            .instruction(Instruction::LoadConst(1))
+            .instruction(Instruction::MakeTuple(2))
+            .instruction(Instruction::LoadConst(2))
+            .instruction(Instruction::MakeTuple(2))
+            .instruction(Instruction::GetTupleField(0))
+            .instruction(Instruction::GetTupleField(1))
+            .instruction(Instruction::Return)
+            .build();
+        let result = vm.execute(chunk).unwrap();
+        assert_eq!(result, Value::Int(2));
     }
 }

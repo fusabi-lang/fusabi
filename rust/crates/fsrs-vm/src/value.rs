@@ -14,6 +14,8 @@ pub enum Value {
     Str(String),
     /// Unit type (void/null equivalent)
     Unit,
+    /// Tuple of values (e.g., (1, 2), (x, "hello", true))
+    Tuple(Vec<Value>),
 }
 
 impl Value {
@@ -24,6 +26,7 @@ impl Value {
             Value::Bool(_) => "bool",
             Value::Str(_) => "string",
             Value::Unit => "unit",
+            Value::Tuple(_) => "tuple",
         }
     }
 
@@ -54,6 +57,15 @@ impl Value {
         }
     }
 
+    /// Attempts to extract a tuple reference from the value
+    /// Returns Some(&Vec<Value>) if the value is Tuple, None otherwise
+    pub fn as_tuple(&self) -> Option<&Vec<Value>> {
+        match self {
+            Value::Tuple(elements) => Some(elements),
+            _ => None,
+        }
+    }
+
     /// Checks if the value is "truthy" for conditional logic
     /// - Bool(false) and Unit are falsy
     /// - Int(0) is falsy
@@ -64,12 +76,18 @@ impl Value {
             Value::Int(n) => *n != 0,
             Value::Str(s) => !s.is_empty(),
             Value::Unit => false,
+            Value::Tuple(elements) => !elements.is_empty(),
         }
     }
 
     /// Checks if the value is Unit
     pub fn is_unit(&self) -> bool {
         matches!(self, Value::Unit)
+    }
+
+    /// Checks if the value is a Tuple
+    pub fn is_tuple(&self) -> bool {
+        matches!(self, Value::Tuple(_))
     }
 }
 
@@ -80,6 +98,16 @@ impl fmt::Display for Value {
             Value::Bool(b) => write!(f, "{}", b),
             Value::Str(s) => write!(f, "{}", s),
             Value::Unit => write!(f, "()"),
+            Value::Tuple(elements) => {
+                write!(f, "(")?;
+                for (i, element) in elements.iter().enumerate() {
+                    if i > 0 {
+                        write!(f, ", ")?;
+                    }
+                    write!(f, "{}", element)?;
+                }
+                write!(f, ")")
+            }
         }
     }
 }
@@ -116,6 +144,12 @@ mod tests {
         assert_eq!(val, Value::Unit);
     }
 
+    #[test]
+    fn test_value_tuple_construction() {
+        let val = Value::Tuple(vec![Value::Int(1), Value::Int(2)]);
+        assert_eq!(val, Value::Tuple(vec![Value::Int(1), Value::Int(2)]));
+    }
+
     // ========== Type Name Tests ==========
 
     #[test]
@@ -142,6 +176,12 @@ mod tests {
         assert_eq!(val.type_name(), "unit");
     }
 
+    #[test]
+    fn test_type_name_tuple() {
+        let val = Value::Tuple(vec![Value::Int(1), Value::Int(2)]);
+        assert_eq!(val.type_name(), "tuple");
+    }
+
     // ========== Extraction Tests (as_*) ==========
 
     #[test]
@@ -155,6 +195,7 @@ mod tests {
         assert_eq!(Value::Bool(true).as_int(), None);
         assert_eq!(Value::Str("42".to_string()).as_int(), None);
         assert_eq!(Value::Unit.as_int(), None);
+        assert_eq!(Value::Tuple(vec![]).as_int(), None);
     }
 
     #[test]
@@ -168,6 +209,7 @@ mod tests {
         assert_eq!(Value::Int(1).as_bool(), None);
         assert_eq!(Value::Str("true".to_string()).as_bool(), None);
         assert_eq!(Value::Unit.as_bool(), None);
+        assert_eq!(Value::Tuple(vec![]).as_bool(), None);
     }
 
     #[test]
@@ -181,6 +223,45 @@ mod tests {
         assert_eq!(Value::Int(42).as_str(), None);
         assert_eq!(Value::Bool(false).as_str(), None);
         assert_eq!(Value::Unit.as_str(), None);
+        assert_eq!(Value::Tuple(vec![]).as_str(), None);
+    }
+
+    #[test]
+    fn test_as_tuple_success() {
+        let val = Value::Tuple(vec![Value::Int(1), Value::Int(2)]);
+        let tuple = val.as_tuple();
+        assert!(tuple.is_some());
+        assert_eq!(tuple.unwrap().len(), 2);
+        assert_eq!(tuple.unwrap()[0], Value::Int(1));
+        assert_eq!(tuple.unwrap()[1], Value::Int(2));
+    }
+
+    #[test]
+    fn test_as_tuple_failure() {
+        assert_eq!(Value::Int(42).as_tuple(), None);
+        assert_eq!(Value::Bool(true).as_tuple(), None);
+        assert_eq!(Value::Str("test".to_string()).as_tuple(), None);
+        assert_eq!(Value::Unit.as_tuple(), None);
+    }
+
+    #[test]
+    fn test_as_tuple_empty() {
+        let val = Value::Tuple(vec![]);
+        let tuple = val.as_tuple();
+        assert!(tuple.is_some());
+        assert_eq!(tuple.unwrap().len(), 0);
+    }
+
+    #[test]
+    fn test_as_tuple_nested() {
+        let val = Value::Tuple(vec![
+            Value::Int(1),
+            Value::Tuple(vec![Value::Int(2), Value::Int(3)]),
+        ]);
+        let tuple = val.as_tuple();
+        assert!(tuple.is_some());
+        assert_eq!(tuple.unwrap().len(), 2);
+        assert!(tuple.unwrap()[1].is_tuple());
     }
 
     // ========== Truthiness Tests ==========
@@ -210,6 +291,13 @@ mod tests {
         assert!(!Value::Unit.is_truthy());
     }
 
+    #[test]
+    fn test_is_truthy_tuple() {
+        assert!(Value::Tuple(vec![Value::Int(1)]).is_truthy());
+        assert!(!Value::Tuple(vec![]).is_truthy());
+        assert!(Value::Tuple(vec![Value::Int(1), Value::Int(2)]).is_truthy());
+    }
+
     // ========== Unit Check Tests ==========
 
     #[test]
@@ -218,6 +306,18 @@ mod tests {
         assert!(!Value::Int(0).is_unit());
         assert!(!Value::Bool(false).is_unit());
         assert!(!Value::Str("".to_string()).is_unit());
+        assert!(!Value::Tuple(vec![]).is_unit());
+    }
+
+    // ========== Tuple Check Tests ==========
+
+    #[test]
+    fn test_is_tuple() {
+        assert!(Value::Tuple(vec![]).is_tuple());
+        assert!(Value::Tuple(vec![Value::Int(1)]).is_tuple());
+        assert!(!Value::Int(42).is_tuple());
+        assert!(!Value::Bool(true).is_tuple());
+        assert!(!Value::Unit.is_tuple());
     }
 
     // ========== Clone Tests ==========
@@ -232,6 +332,13 @@ mod tests {
     #[test]
     fn test_clone_str() {
         let val1 = Value::Str("hello".to_string());
+        let val2 = val1.clone();
+        assert_eq!(val1, val2);
+    }
+
+    #[test]
+    fn test_clone_tuple() {
+        let val1 = Value::Tuple(vec![Value::Int(1), Value::Int(2)]);
         let val2 = val1.clone();
         assert_eq!(val1, val2);
     }
@@ -274,6 +381,43 @@ mod tests {
         assert_eq!(format!("{}", val), "()");
     }
 
+    #[test]
+    fn test_display_tuple_empty() {
+        let val = Value::Tuple(vec![]);
+        assert_eq!(format!("{}", val), "()");
+    }
+
+    #[test]
+    fn test_display_tuple_pair() {
+        let val = Value::Tuple(vec![Value::Int(1), Value::Int(2)]);
+        assert_eq!(format!("{}", val), "(1, 2)");
+    }
+
+    #[test]
+    fn test_display_tuple_triple() {
+        let val = Value::Tuple(vec![Value::Int(1), Value::Int(2), Value::Int(3)]);
+        assert_eq!(format!("{}", val), "(1, 2, 3)");
+    }
+
+    #[test]
+    fn test_display_tuple_nested() {
+        let val = Value::Tuple(vec![
+            Value::Int(1),
+            Value::Tuple(vec![Value::Int(2), Value::Int(3)]),
+        ]);
+        assert_eq!(format!("{}", val), "(1, (2, 3))");
+    }
+
+    #[test]
+    fn test_display_tuple_mixed_types() {
+        let val = Value::Tuple(vec![
+            Value::Int(42),
+            Value::Str("hello".to_string()),
+            Value::Bool(true),
+        ]);
+        assert_eq!(format!("{}", val), "(42, hello, true)");
+    }
+
     // ========== Debug Tests ==========
 
     #[test]
@@ -298,6 +442,12 @@ mod tests {
     fn test_debug_unit() {
         let val = Value::Unit;
         assert_eq!(format!("{:?}", val), "Unit");
+    }
+
+    #[test]
+    fn test_debug_tuple() {
+        let val = Value::Tuple(vec![Value::Int(1), Value::Int(2)]);
+        assert_eq!(format!("{:?}", val), "Tuple([Int(1), Int(2)])");
     }
 
     // ========== Equality Tests ==========
@@ -332,10 +482,36 @@ mod tests {
     }
 
     #[test]
+    fn test_equality_tuple() {
+        assert_eq!(
+            Value::Tuple(vec![Value::Int(1), Value::Int(2)]),
+            Value::Tuple(vec![Value::Int(1), Value::Int(2)])
+        );
+        assert_ne!(
+            Value::Tuple(vec![Value::Int(1), Value::Int(2)]),
+            Value::Tuple(vec![Value::Int(2), Value::Int(1)])
+        );
+    }
+
+    #[test]
+    fn test_equality_tuple_nested() {
+        let val1 = Value::Tuple(vec![
+            Value::Int(1),
+            Value::Tuple(vec![Value::Int(2), Value::Int(3)]),
+        ]);
+        let val2 = Value::Tuple(vec![
+            Value::Int(1),
+            Value::Tuple(vec![Value::Int(2), Value::Int(3)]),
+        ]);
+        assert_eq!(val1, val2);
+    }
+
+    #[test]
     fn test_inequality_different_types() {
         assert_ne!(Value::Int(42), Value::Bool(true));
         assert_ne!(Value::Bool(false), Value::Unit);
         assert_ne!(Value::Str("42".to_string()), Value::Int(42));
+        assert_ne!(Value::Tuple(vec![]), Value::Unit);
     }
 
     // ========== Edge Case Tests ==========
@@ -360,5 +536,17 @@ mod tests {
         let val = Value::Str("Hello 世界 🦀".to_string());
         assert_eq!(val.as_str(), Some("Hello 世界 🦀"));
         assert_eq!(format!("{}", val), "Hello 世界 🦀");
+    }
+
+    #[test]
+    fn test_tuple_large() {
+        let val = Value::Tuple(vec![
+            Value::Int(1),
+            Value::Int(2),
+            Value::Int(3),
+            Value::Int(4),
+            Value::Int(5),
+        ]);
+        assert_eq!(format!("{}", val), "(1, 2, 3, 4, 5)");
     }
 }

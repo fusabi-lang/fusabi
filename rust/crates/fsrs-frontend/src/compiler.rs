@@ -47,6 +47,8 @@ pub enum CompileError {
     InvalidJumpOffset,
     /// Unsupported float operations in Phase 1
     UnsupportedFloat,
+    /// Tuple too large (max u16::MAX elements)
+    TupleTooLarge,
 }
 
 impl fmt::Display for CompileError {
@@ -66,6 +68,9 @@ impl fmt::Display for CompileError {
             }
             CompileError::UnsupportedFloat => {
                 write!(f, "Float operations not supported in Phase 1")
+            }
+            CompileError::TupleTooLarge => {
+                write!(f, "Tuple too large (max {} elements)", u16::MAX)
             }
         }
     }
@@ -124,13 +129,7 @@ impl Compiler {
                 then_branch,
                 else_branch,
             } => self.compile_if(cond, then_branch, else_branch),
-            // TODO(Layer 2): Implement tuple compilation
-            // This will be implemented in the next layer (parser/compiler integration)
-            Expr::Tuple(_elements) => {
-                // Placeholder for Layer 1: AST only
-                // Layer 2 will add: parser support, bytecode instructions, VM runtime
-                Ok(())
-            }
+            Expr::Tuple(elements) => self.compile_tuple(elements),
         }
     }
 
@@ -186,6 +185,25 @@ impl Compiler {
             BinOp::Or => Instruction::Or,
         };
         self.emit(instr);
+        Ok(())
+    }
+
+    /// Compile a tuple expression
+    fn compile_tuple(&mut self, elements: &[Expr]) -> CompileResult<()> {
+        // Check if tuple size fits in u16
+        if elements.len() > u16::MAX as usize {
+            return Err(CompileError::TupleTooLarge);
+        }
+
+        // Compile each element (left to right)
+        for element in elements {
+            self.compile_expr(element)?;
+        }
+
+        // Emit MakeTuple instruction with element count
+        let element_count = elements.len() as u16;
+        self.emit(Instruction::MakeTuple(element_count));
+
         Ok(())
     }
 
@@ -751,5 +769,217 @@ mod tests {
         // Note: Current implementation doesn't deduplicate
         // This test documents current behavior
         assert!(chunk.constants.len() <= 2);
+    }
+
+    // ========================================================================
+    // TDD: Tuple Compilation Tests
+    // ========================================================================
+
+    #[test]
+    fn test_compile_tuple_empty() {
+        // ()
+        let expr = Expr::Tuple(vec![]);
+        let chunk = Compiler::compile(&expr).unwrap();
+
+        // Should have: MakeTuple(0), Return
+        assert_eq!(chunk.instructions[0], Instruction::MakeTuple(0));
+        assert_eq!(chunk.instructions[1], Instruction::Return);
+    }
+
+    #[test]
+    fn test_compile_tuple_pair() {
+        // (1, 2)
+        let expr = Expr::Tuple(vec![Expr::Lit(Literal::Int(1)), Expr::Lit(Literal::Int(2))]);
+        let chunk = Compiler::compile(&expr).unwrap();
+
+        // Should have: LoadConst(1), LoadConst(2), MakeTuple(2), Return
+        assert_eq!(chunk.instructions[0], Instruction::LoadConst(0));
+        assert_eq!(chunk.instructions[1], Instruction::LoadConst(1));
+        assert_eq!(chunk.instructions[2], Instruction::MakeTuple(2));
+        assert_eq!(chunk.instructions[3], Instruction::Return);
+    }
+
+    #[test]
+    fn test_compile_tuple_triple() {
+        // (1, 2, 3)
+        let expr = Expr::Tuple(vec![
+            Expr::Lit(Literal::Int(1)),
+            Expr::Lit(Literal::Int(2)),
+            Expr::Lit(Literal::Int(3)),
+        ]);
+        let chunk = Compiler::compile(&expr).unwrap();
+
+        assert_eq!(chunk.instructions[0], Instruction::LoadConst(0));
+        assert_eq!(chunk.instructions[1], Instruction::LoadConst(1));
+        assert_eq!(chunk.instructions[2], Instruction::LoadConst(2));
+        assert_eq!(chunk.instructions[3], Instruction::MakeTuple(3));
+    }
+
+    #[test]
+    fn test_compile_tuple_nested() {
+        // (1, (2, 3))
+        let expr = Expr::Tuple(vec![
+            Expr::Lit(Literal::Int(1)),
+            Expr::Tuple(vec![Expr::Lit(Literal::Int(2)), Expr::Lit(Literal::Int(3))]),
+        ]);
+        let chunk = Compiler::compile(&expr).unwrap();
+
+        // Inner tuple is compiled first
+        assert!(chunk
+            .instructions
+            .iter()
+            .any(|i| matches!(i, Instruction::MakeTuple(2))));
+        // Outer tuple follows
+        assert!(chunk
+            .instructions
+            .iter()
+            .any(|i| matches!(i, Instruction::MakeTuple(2))));
+    }
+
+    #[test]
+    fn test_compile_tuple_with_variables() {
+        // let x = 1 in let y = 2 in (x, y)
+        let expr = Expr::Let {
+            name: "x".to_string(),
+            value: Box::new(Expr::Lit(Literal::Int(1))),
+            body: Box::new(Expr::Let {
+                name: "y".to_string(),
+                value: Box::new(Expr::Lit(Literal::Int(2))),
+                body: Box::new(Expr::Tuple(vec![
+                    Expr::Var("x".to_string()),
+                    Expr::Var("y".to_string()),
+                ])),
+            }),
+        };
+
+        let chunk = Compiler::compile(&expr).unwrap();
+
+        assert!(chunk.instructions.contains(&Instruction::LoadLocal(0)));
+        assert!(chunk.instructions.contains(&Instruction::LoadLocal(1)));
+        assert!(chunk
+            .instructions
+            .iter()
+            .any(|i| matches!(i, Instruction::MakeTuple(2))));
+    }
+
+    #[test]
+    fn test_compile_tuple_with_expressions() {
+        // (1 + 2, 3 * 4)
+        let expr = Expr::Tuple(vec![
+            Expr::BinOp {
+                op: BinOp::Add,
+                left: Box::new(Expr::Lit(Literal::Int(1))),
+                right: Box::new(Expr::Lit(Literal::Int(2))),
+            },
+            Expr::BinOp {
+                op: BinOp::Mul,
+                left: Box::new(Expr::Lit(Literal::Int(3))),
+                right: Box::new(Expr::Lit(Literal::Int(4))),
+            },
+        ]);
+
+        let chunk = Compiler::compile(&expr).unwrap();
+
+        assert!(chunk.instructions.contains(&Instruction::Add));
+        assert!(chunk.instructions.contains(&Instruction::Mul));
+        assert!(chunk
+            .instructions
+            .iter()
+            .any(|i| matches!(i, Instruction::MakeTuple(2))));
+    }
+
+    #[test]
+    fn test_compile_tuple_mixed_types() {
+        // (42, "hello", true)
+        let expr = Expr::Tuple(vec![
+            Expr::Lit(Literal::Int(42)),
+            Expr::Lit(Literal::Str("hello".to_string())),
+            Expr::Lit(Literal::Bool(true)),
+        ]);
+
+        let chunk = Compiler::compile(&expr).unwrap();
+
+        assert_eq!(chunk.constants[0], Value::Int(42));
+        assert_eq!(chunk.constants[1], Value::Str("hello".to_string()));
+        assert_eq!(chunk.constants[2], Value::Bool(true));
+        assert!(chunk
+            .instructions
+            .iter()
+            .any(|i| matches!(i, Instruction::MakeTuple(3))));
+    }
+
+    #[test]
+    fn test_compile_tuple_large() {
+        // (1, 2, 3, 4, 5, 6, 7, 8)
+        let expr = Expr::Tuple(vec![
+            Expr::Lit(Literal::Int(1)),
+            Expr::Lit(Literal::Int(2)),
+            Expr::Lit(Literal::Int(3)),
+            Expr::Lit(Literal::Int(4)),
+            Expr::Lit(Literal::Int(5)),
+            Expr::Lit(Literal::Int(6)),
+            Expr::Lit(Literal::Int(7)),
+            Expr::Lit(Literal::Int(8)),
+        ]);
+
+        let chunk = Compiler::compile(&expr).unwrap();
+
+        assert!(chunk
+            .instructions
+            .iter()
+            .any(|i| matches!(i, Instruction::MakeTuple(8))));
+    }
+
+    #[test]
+    fn test_compile_tuple_in_let() {
+        // let pair = (1, 2) in pair
+        let expr = Expr::Let {
+            name: "pair".to_string(),
+            value: Box::new(Expr::Tuple(vec![
+                Expr::Lit(Literal::Int(1)),
+                Expr::Lit(Literal::Int(2)),
+            ])),
+            body: Box::new(Expr::Var("pair".to_string())),
+        };
+
+        let chunk = Compiler::compile(&expr).unwrap();
+
+        assert!(chunk
+            .instructions
+            .iter()
+            .any(|i| matches!(i, Instruction::MakeTuple(2))));
+        assert!(chunk.instructions.contains(&Instruction::StoreLocal(0)));
+        assert!(chunk.instructions.contains(&Instruction::LoadLocal(0)));
+    }
+
+    #[test]
+    fn test_compile_tuple_single_element() {
+        // (42)
+        let expr = Expr::Tuple(vec![Expr::Lit(Literal::Int(42))]);
+        let chunk = Compiler::compile(&expr).unwrap();
+
+        assert!(chunk
+            .instructions
+            .iter()
+            .any(|i| matches!(i, Instruction::MakeTuple(1))));
+    }
+
+    #[test]
+    fn test_compile_tuple_deeply_nested() {
+        // ((1, 2), (3, 4))
+        let expr = Expr::Tuple(vec![
+            Expr::Tuple(vec![Expr::Lit(Literal::Int(1)), Expr::Lit(Literal::Int(2))]),
+            Expr::Tuple(vec![Expr::Lit(Literal::Int(3)), Expr::Lit(Literal::Int(4))]),
+        ]);
+
+        let chunk = Compiler::compile(&expr).unwrap();
+
+        // Should have two inner MakeTuple(2) and one outer MakeTuple(2)
+        let make_tuple_count = chunk
+            .instructions
+            .iter()
+            .filter(|i| matches!(i, Instruction::MakeTuple(2)))
+            .count();
+        assert_eq!(make_tuple_count, 3);
     }
 }

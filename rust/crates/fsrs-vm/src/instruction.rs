@@ -85,6 +85,15 @@ pub enum Instruction {
 
     /// Return from current function
     Return,
+
+    // ===== Tuple Operations =====
+    /// Create tuple from N stack values
+    /// Pop N values from stack, create tuple, push tuple
+    MakeTuple(u16),
+
+    /// Extract field from tuple by index
+    /// Pop tuple from stack, push field at index
+    GetTupleField(u8),
 }
 
 impl fmt::Display for Instruction {
@@ -123,6 +132,10 @@ impl fmt::Display for Instruction {
             Instruction::Call(argc) => write!(f, "CALL {}", argc),
             Instruction::TailCall(argc) => write!(f, "TAIL_CALL {}", argc),
             Instruction::Return => write!(f, "RETURN"),
+
+            // Tuple operations
+            Instruction::MakeTuple(n) => write!(f, "MAKE_TUPLE {}", n),
+            Instruction::GetTupleField(idx) => write!(f, "GET_TUPLE_FIELD {}", idx),
         }
     }
 }
@@ -182,6 +195,18 @@ mod tests {
         assert_eq!(Instruction::JumpIfFalse(-5), Instruction::JumpIfFalse(-5));
         assert_eq!(Instruction::Call(3), Instruction::Call(3));
         assert_eq!(Instruction::Return, Instruction::Return);
+    }
+
+    #[test]
+    fn test_instruction_make_tuple() {
+        let instr = Instruction::MakeTuple(3);
+        assert_eq!(instr, Instruction::MakeTuple(3));
+    }
+
+    #[test]
+    fn test_instruction_get_tuple_field() {
+        let instr = Instruction::GetTupleField(1);
+        assert_eq!(instr, Instruction::GetTupleField(1));
     }
 
     // ========== Display Formatting Tests ==========
@@ -257,6 +282,24 @@ mod tests {
         assert_eq!(format!("{}", Instruction::Return), "RETURN");
     }
 
+    #[test]
+    fn test_display_make_tuple() {
+        assert_eq!(format!("{}", Instruction::MakeTuple(2)), "MAKE_TUPLE 2");
+        assert_eq!(format!("{}", Instruction::MakeTuple(5)), "MAKE_TUPLE 5");
+    }
+
+    #[test]
+    fn test_display_get_tuple_field() {
+        assert_eq!(
+            format!("{}", Instruction::GetTupleField(0)),
+            "GET_TUPLE_FIELD 0"
+        );
+        assert_eq!(
+            format!("{}", Instruction::GetTupleField(3)),
+            "GET_TUPLE_FIELD 3"
+        );
+    }
+
     // ========== Clone Tests ==========
 
     #[test]
@@ -269,6 +312,13 @@ mod tests {
     #[test]
     fn test_clone_jump() {
         let instr1 = Instruction::Jump(10);
+        let instr2 = instr1.clone();
+        assert_eq!(instr1, instr2);
+    }
+
+    #[test]
+    fn test_clone_make_tuple() {
+        let instr1 = Instruction::MakeTuple(3);
         let instr2 = instr1.clone();
         assert_eq!(instr1, instr2);
     }
@@ -287,6 +337,18 @@ mod tests {
         assert_eq!(format!("{:?}", instr), "Add");
     }
 
+    #[test]
+    fn test_debug_make_tuple() {
+        let instr = Instruction::MakeTuple(2);
+        assert_eq!(format!("{:?}", instr), "MakeTuple(2)");
+    }
+
+    #[test]
+    fn test_debug_get_tuple_field() {
+        let instr = Instruction::GetTupleField(1);
+        assert_eq!(format!("{:?}", instr), "GetTupleField(1)");
+    }
+
     // ========== Equality Tests ==========
 
     #[test]
@@ -299,6 +361,14 @@ mod tests {
     fn test_equality_different_variants() {
         assert_ne!(Instruction::Add, Instruction::Sub);
         assert_ne!(Instruction::Jump(5), Instruction::JumpIfFalse(5));
+    }
+
+    #[test]
+    fn test_equality_tuple_instructions() {
+        assert_eq!(Instruction::MakeTuple(2), Instruction::MakeTuple(2));
+        assert_ne!(Instruction::MakeTuple(2), Instruction::MakeTuple(3));
+        assert_eq!(Instruction::GetTupleField(0), Instruction::GetTupleField(0));
+        assert_ne!(Instruction::GetTupleField(0), Instruction::GetTupleField(1));
     }
 
     // ========== Edge Case Tests ==========
@@ -325,5 +395,17 @@ mod tests {
             format!("{}", Instruction::Jump(i16::MIN)),
             format!("JUMP {}", i16::MIN)
         );
+    }
+
+    #[test]
+    fn test_max_tuple_size() {
+        let instr = Instruction::MakeTuple(u16::MAX);
+        assert_eq!(format!("{}", instr), format!("MAKE_TUPLE {}", u16::MAX));
+    }
+
+    #[test]
+    fn test_max_tuple_field_index() {
+        let instr = Instruction::GetTupleField(u8::MAX);
+        assert_eq!(format!("{}", instr), format!("GET_TUPLE_FIELD {}", u8::MAX));
     }
 }

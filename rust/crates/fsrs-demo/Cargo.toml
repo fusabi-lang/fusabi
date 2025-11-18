@@ -3,6 +3,14 @@ name = "fsrs-demo"
 version = "0.1.0"
 edition = "2021"
 
+[[bin]]
+name = "fsrs-demo"
+path = "src/main.rs"
+
+[lib]
+name = "fsrs_demo"
+path = "src/lib.rs"
+
 [dependencies]
 fsrs-frontend = { path = "../fsrs-frontend" }
 fsrs-vm = { path = "../fsrs-vm" }

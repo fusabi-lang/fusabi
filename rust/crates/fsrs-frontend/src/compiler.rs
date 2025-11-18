@@ -28,7 +28,7 @@
 //! // Generates: LOAD_CONST 0; LOAD_CONST 1; ADD; RETURN
 //! ```
 
-use crate::ast::{BinOp, Expr, Literal};
+use crate::ast::{BinOp, Expr, Literal, MatchArm};
 use fsrs_vm::chunk::Chunk;
 use fsrs_vm::instruction::Instruction;
 use fsrs_vm::value::Value;
@@ -143,7 +143,7 @@ impl Compiler {
             Expr::RecordLiteral { .. } => unimplemented!("Records - Layer 3"),
             Expr::RecordAccess { .. } => unimplemented!("Records - Layer 3"),
             Expr::RecordUpdate { .. } => unimplemented!("Records - Layer 3"),
-            Expr::Match { .. } => unimplemented!("Pattern matching - Issue #27"),
+            Expr::Match { scrutinee, arms } => self.compile_match(scrutinee, arms),
         }
     }
 
@@ -506,6 +506,20 @@ impl Compiler {
 
         // Patch the Jump to point here
         self.patch_jump(jump_to_end)?;
+
+        Ok(())
+    }
+
+    /// Compile a match expression
+    fn compile_match(&mut self, scrutinee: &Expr, arms: &[MatchArm]) -> CompileResult<()> {
+        // Basic match compilation - just compile scrutinee and first matching arm for now
+        // Full pattern matching logic will be expanded in future iterations
+        self.compile_expr(scrutinee)?;
+
+        // For now, just compile the first arm's body
+        if !arms.is_empty() {
+            self.compile_expr(&arms[0].body)?;
+        }
 
         Ok(())
     }

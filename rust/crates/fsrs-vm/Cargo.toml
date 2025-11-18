@@ -7,3 +7,6 @@ edition = "2021"
 path = "src/lib.rs"
 
 [dependencies]
+
+[dev-dependencies]
+criterion = "0.5"

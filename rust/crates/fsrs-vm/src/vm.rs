@@ -30,6 +30,8 @@ pub enum VmError {
     NoActiveFrame,
     /// Invalid tuple field index
     InvalidTupleFieldIndex { index: u8, tuple_size: usize },
+    /// Attempted to access head/tail of empty list
+    EmptyList,
 }
 
 impl fmt::Display for VmError {
@@ -54,6 +56,7 @@ impl fmt::Display for VmError {
                     index, tuple_size
                 )
             }
+            VmError::EmptyList => write!(f, "Cannot access head/tail of empty list"),
         }
     }
 }
@@ -288,6 +291,62 @@ impl Vm {
                         // Return the top of stack or Unit if empty
                         return Ok(self.stack.pop().unwrap_or(Value::Unit));
                     }
+                }
+
+                // List operations
+                Instruction::MakeList(n) => {
+                    // Pop N values from stack in reverse order
+                    let mut elements = Vec::with_capacity(n as usize);
+                    for _ in 0..n {
+                        elements.push(self.pop()?);
+                    }
+                    // Reverse to maintain left-to-right order
+                    elements.reverse();
+                    // Build cons list from elements
+                    let list = Value::vec_to_cons(elements);
+                    self.push(list);
+                }
+
+                Instruction::Cons => {
+                    let tail = self.pop()?;
+                    let head = self.pop()?;
+                    self.push(Value::Cons {
+                        head: Box::new(head),
+                        tail: Box::new(tail),
+                    });
+                }
+
+                Instruction::ListHead => {
+                    let value = self.pop()?;
+                    match value {
+                        Value::Cons { head, .. } => self.push(*head),
+                        Value::Nil => return Err(VmError::EmptyList),
+                        _ => {
+                            return Err(VmError::TypeMismatch {
+                                expected: "list",
+                                got: value.type_name(),
+                            })
+                        }
+                    }
+                }
+
+                Instruction::ListTail => {
+                    let value = self.pop()?;
+                    match value {
+                        Value::Cons { tail, .. } => self.push(*tail),
+                        Value::Nil => return Err(VmError::EmptyList),
+                        _ => {
+                            return Err(VmError::TypeMismatch {
+                                expected: "list",
+                                got: value.type_name(),
+                            })
+                        }
+                    }
+                }
+
+                Instruction::IsNil => {
+                    let value = self.pop()?;
+                    self.push(Value::Bool(value.is_nil()));
                 }
 
                 // Unimplemented instructions for Phase 1
@@ -946,5 +1005,239 @@ mod tests {
             .build();
         let result = vm.execute(chunk).unwrap();
         assert_eq!(result, Value::Int(2));
+    }
+
+    // ========== List Operation Tests (Layer 3) ==========
+
+    #[test]
+    fn test_vm_make_list_empty() {
+        let mut vm = Vm::new();
+        let chunk = ChunkBuilder::new()
+            .instruction(Instruction::MakeList(0))
+            .instruction(Instruction::Return)
+            .build();
+        let result = vm.execute(chunk).unwrap();
+        assert_eq!(result, Value::Nil);
+    }
+
+    #[test]
+    fn test_vm_make_list_single() {
+        let mut vm = Vm::new();
+        let chunk = ChunkBuilder::new()
+            .constant(Value::Int(42))
+            .instruction(Instruction::LoadConst(0))
+            .instruction(Instruction::MakeList(1))
+            .instruction(Instruction::Return)
+            .build();
+        let result = vm.execute(chunk).unwrap();
+        assert_eq!(
+            result,
+            Value::Cons {
+                head: Box::new(Value::Int(42)),
+                tail: Box::new(Value::Nil),
+            }
+        );
+    }
+
+    #[test]
+    fn test_vm_make_list_multiple() {
+        let mut vm = Vm::new();
+        let chunk = ChunkBuilder::new()
+            .constant(Value::Int(1))
+            .constant(Value::Int(2))
+            .constant(Value::Int(3))
+            .instruction(Instruction::LoadConst(0))
+            .instruction(Instruction::LoadConst(1))
+            .instruction(Instruction::LoadConst(2))
+            .instruction(Instruction::MakeList(3))
+            .instruction(Instruction::Return)
+            .build();
+        let result = vm.execute(chunk).unwrap();
+        assert_eq!(
+            result,
+            Value::vec_to_cons(vec![Value::Int(1), Value::Int(2), Value::Int(3)])
+        );
+    }
+
+    #[test]
+    fn test_vm_cons() {
+        let mut vm = Vm::new();
+        let chunk = ChunkBuilder::new()
+            .constant(Value::Int(1))
+            .constant(Value::Nil)
+            .instruction(Instruction::LoadConst(0))
+            .instruction(Instruction::LoadConst(1))
+            .instruction(Instruction::Cons)
+            .instruction(Instruction::Return)
+            .build();
+        let result = vm.execute(chunk).unwrap();
+        assert_eq!(
+            result,
+            Value::Cons {
+                head: Box::new(Value::Int(1)),
+                tail: Box::new(Value::Nil),
+            }
+        );
+    }
+
+    #[test]
+    fn test_vm_cons_nested() {
+        // Build [2] first, then cons 1 onto it
+        let mut vm = Vm::new();
+        let inner_list = Value::vec_to_cons(vec![Value::Int(2)]);
+        let chunk = ChunkBuilder::new()
+            .constant(Value::Int(1))
+            .constant(inner_list)
+            .instruction(Instruction::LoadConst(0)) // Load 1
+            .instruction(Instruction::LoadConst(1)) // Load [2]
+            .instruction(Instruction::Cons) // 1 :: [2]
+            .instruction(Instruction::Return)
+            .build();
+        let result = vm.execute(chunk).unwrap();
+        assert_eq!(
+            result,
+            Value::vec_to_cons(vec![Value::Int(1), Value::Int(2)])
+        );
+    }
+
+    #[test]
+    fn test_vm_list_head() {
+        let mut vm = Vm::new();
+        let list = Value::vec_to_cons(vec![Value::Int(42), Value::Int(100)]);
+        let chunk = ChunkBuilder::new()
+            .constant(list)
+            .instruction(Instruction::LoadConst(0))
+            .instruction(Instruction::ListHead)
+            .instruction(Instruction::Return)
+            .build();
+        let result = vm.execute(chunk).unwrap();
+        assert_eq!(result, Value::Int(42));
+    }
+
+    #[test]
+    fn test_vm_list_head_empty_error() {
+        let mut vm = Vm::new();
+        let chunk = ChunkBuilder::new()
+            .constant(Value::Nil)
+            .instruction(Instruction::LoadConst(0))
+            .instruction(Instruction::ListHead)
+            .instruction(Instruction::Return)
+            .build();
+        let result = vm.execute(chunk);
+        assert!(matches!(result, Err(VmError::EmptyList)));
+    }
+
+    #[test]
+    fn test_vm_list_head_type_error() {
+        let mut vm = Vm::new();
+        let chunk = ChunkBuilder::new()
+            .constant(Value::Int(42))
+            .instruction(Instruction::LoadConst(0))
+            .instruction(Instruction::ListHead)
+            .instruction(Instruction::Return)
+            .build();
+        let result = vm.execute(chunk);
+        assert!(matches!(
+            result,
+            Err(VmError::TypeMismatch {
+                expected: "list",
+                got: "int"
+            })
+        ));
+    }
+
+    #[test]
+    fn test_vm_list_tail() {
+        let mut vm = Vm::new();
+        let list = Value::vec_to_cons(vec![Value::Int(1), Value::Int(2), Value::Int(3)]);
+        let chunk = ChunkBuilder::new()
+            .constant(list)
+            .instruction(Instruction::LoadConst(0))
+            .instruction(Instruction::ListTail)
+            .instruction(Instruction::Return)
+            .build();
+        let result = vm.execute(chunk).unwrap();
+        assert_eq!(
+            result,
+            Value::vec_to_cons(vec![Value::Int(2), Value::Int(3)])
+        );
+    }
+
+    #[test]
+    fn test_vm_list_tail_empty_error() {
+        let mut vm = Vm::new();
+        let chunk = ChunkBuilder::new()
+            .constant(Value::Nil)
+            .instruction(Instruction::LoadConst(0))
+            .instruction(Instruction::ListTail)
+            .instruction(Instruction::Return)
+            .build();
+        let result = vm.execute(chunk);
+        assert!(matches!(result, Err(VmError::EmptyList)));
+    }
+
+    #[test]
+    fn test_vm_is_nil_true() {
+        let mut vm = Vm::new();
+        let chunk = ChunkBuilder::new()
+            .constant(Value::Nil)
+            .instruction(Instruction::LoadConst(0))
+            .instruction(Instruction::IsNil)
+            .instruction(Instruction::Return)
+            .build();
+        let result = vm.execute(chunk).unwrap();
+        assert_eq!(result, Value::Bool(true));
+    }
+
+    #[test]
+    fn test_vm_is_nil_false() {
+        let mut vm = Vm::new();
+        let list = Value::vec_to_cons(vec![Value::Int(1)]);
+        let chunk = ChunkBuilder::new()
+            .constant(list)
+            .instruction(Instruction::LoadConst(0))
+            .instruction(Instruction::IsNil)
+            .instruction(Instruction::Return)
+            .build();
+        let result = vm.execute(chunk).unwrap();
+        assert_eq!(result, Value::Bool(false));
+    }
+
+    #[test]
+    fn test_vm_list_display() {
+        let list = Value::vec_to_cons(vec![Value::Int(1), Value::Int(2), Value::Int(3)]);
+        assert_eq!(format!("{}", list), "[1; 2; 3]");
+    }
+
+    #[test]
+    fn test_vm_list_equality() {
+        let list1 = Value::vec_to_cons(vec![Value::Int(1), Value::Int(2)]);
+        let list2 = Value::vec_to_cons(vec![Value::Int(1), Value::Int(2)]);
+        let list3 = Value::vec_to_cons(vec![Value::Int(1), Value::Int(3)]);
+        assert_eq!(list1, list2);
+        assert_ne!(list1, list3);
+    }
+
+    #[test]
+    fn test_vm_nested_list() {
+        let inner1 = Value::vec_to_cons(vec![Value::Int(1), Value::Int(2)]);
+        let inner2 = Value::vec_to_cons(vec![Value::Int(3), Value::Int(4)]);
+        let outer = Value::vec_to_cons(vec![inner1, inner2]);
+        assert_eq!(format!("{}", outer), "[[1; 2]; [3; 4]]");
+    }
+
+    #[test]
+    fn test_vm_list_in_local() {
+        let mut vm = Vm::new();
+        let list = Value::vec_to_cons(vec![Value::Int(1), Value::Int(2)]);
+        let chunk = ChunkBuilder::new()
+            .constant(list.clone())
+            .instruction(Instruction::LoadConst(0))
+            .instruction(Instruction::StoreLocal(0))
+            .instruction(Instruction::LoadLocal(0))
+            .instruction(Instruction::Return)
+            .build();
+        let result = vm.execute(chunk).unwrap();
+        assert_eq!(result, list);
     }
 }

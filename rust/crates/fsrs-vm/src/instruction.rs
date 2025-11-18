@@ -94,6 +94,23 @@ pub enum Instruction {
     /// Extract field from tuple by index
     /// Pop tuple from stack, push field at index
     GetTupleField(u8),
+
+    // ===== List Operations =====
+    /// Create list from N stack values [e1; e2; ...]
+    /// Pop N values from stack (in reverse order), build cons list, push list
+    MakeList(u16),
+
+    /// Cons: Pop tail, pop head, push (head :: tail)
+    Cons,
+
+    /// ListHead: Pop list, push head (error if empty)
+    ListHead,
+
+    /// ListTail: Pop list, push tail (error if empty)
+    ListTail,
+
+    /// IsNil: Pop list, push bool (true if empty)
+    IsNil,
 }
 
 impl fmt::Display for Instruction {
@@ -136,6 +153,13 @@ impl fmt::Display for Instruction {
             // Tuple operations
             Instruction::MakeTuple(n) => write!(f, "MAKE_TUPLE {}", n),
             Instruction::GetTupleField(idx) => write!(f, "GET_TUPLE_FIELD {}", idx),
+
+            // List operations
+            Instruction::MakeList(n) => write!(f, "MAKE_LIST {}", n),
+            Instruction::Cons => write!(f, "CONS"),
+            Instruction::ListHead => write!(f, "LIST_HEAD"),
+            Instruction::ListTail => write!(f, "LIST_TAIL"),
+            Instruction::IsNil => write!(f, "IS_NIL"),
         }
     }
 }
@@ -207,6 +231,38 @@ mod tests {
     fn test_instruction_get_tuple_field() {
         let instr = Instruction::GetTupleField(1);
         assert_eq!(instr, Instruction::GetTupleField(1));
+    }
+
+    // ========== List Instruction Tests ==========
+
+    #[test]
+    fn test_instruction_make_list() {
+        let instr = Instruction::MakeList(3);
+        assert_eq!(instr, Instruction::MakeList(3));
+    }
+
+    #[test]
+    fn test_instruction_cons() {
+        let instr = Instruction::Cons;
+        assert_eq!(instr, Instruction::Cons);
+    }
+
+    #[test]
+    fn test_instruction_list_head() {
+        let instr = Instruction::ListHead;
+        assert_eq!(instr, Instruction::ListHead);
+    }
+
+    #[test]
+    fn test_instruction_list_tail() {
+        let instr = Instruction::ListTail;
+        assert_eq!(instr, Instruction::ListTail);
+    }
+
+    #[test]
+    fn test_instruction_is_nil() {
+        let instr = Instruction::IsNil;
+        assert_eq!(instr, Instruction::IsNil);
     }
 
     // ========== Display Formatting Tests ==========
@@ -300,6 +356,32 @@ mod tests {
         );
     }
 
+    #[test]
+    fn test_display_make_list() {
+        assert_eq!(format!("{}", Instruction::MakeList(3)), "MAKE_LIST 3");
+        assert_eq!(format!("{}", Instruction::MakeList(0)), "MAKE_LIST 0");
+    }
+
+    #[test]
+    fn test_display_cons() {
+        assert_eq!(format!("{}", Instruction::Cons), "CONS");
+    }
+
+    #[test]
+    fn test_display_list_head() {
+        assert_eq!(format!("{}", Instruction::ListHead), "LIST_HEAD");
+    }
+
+    #[test]
+    fn test_display_list_tail() {
+        assert_eq!(format!("{}", Instruction::ListTail), "LIST_TAIL");
+    }
+
+    #[test]
+    fn test_display_is_nil() {
+        assert_eq!(format!("{}", Instruction::IsNil), "IS_NIL");
+    }
+
     // ========== Clone Tests ==========
 
     #[test]
@@ -319,6 +401,13 @@ mod tests {
     #[test]
     fn test_clone_make_tuple() {
         let instr1 = Instruction::MakeTuple(3);
+        let instr2 = instr1.clone();
+        assert_eq!(instr1, instr2);
+    }
+
+    #[test]
+    fn test_clone_make_list() {
+        let instr1 = Instruction::MakeList(5);
         let instr2 = instr1.clone();
         assert_eq!(instr1, instr2);
     }
@@ -349,6 +438,18 @@ mod tests {
         assert_eq!(format!("{:?}", instr), "GetTupleField(1)");
     }
 
+    #[test]
+    fn test_debug_make_list() {
+        let instr = Instruction::MakeList(3);
+        assert_eq!(format!("{:?}", instr), "MakeList(3)");
+    }
+
+    #[test]
+    fn test_debug_cons() {
+        let instr = Instruction::Cons;
+        assert_eq!(format!("{:?}", instr), "Cons");
+    }
+
     // ========== Equality Tests ==========
 
     #[test]
@@ -369,6 +470,16 @@ mod tests {
         assert_ne!(Instruction::MakeTuple(2), Instruction::MakeTuple(3));
         assert_eq!(Instruction::GetTupleField(0), Instruction::GetTupleField(0));
         assert_ne!(Instruction::GetTupleField(0), Instruction::GetTupleField(1));
+    }
+
+    #[test]
+    fn test_equality_list_instructions() {
+        assert_eq!(Instruction::MakeList(3), Instruction::MakeList(3));
+        assert_ne!(Instruction::MakeList(3), Instruction::MakeList(5));
+        assert_eq!(Instruction::Cons, Instruction::Cons);
+        assert_eq!(Instruction::ListHead, Instruction::ListHead);
+        assert_eq!(Instruction::ListTail, Instruction::ListTail);
+        assert_eq!(Instruction::IsNil, Instruction::IsNil);
     }
 
     // ========== Edge Case Tests ==========
@@ -407,5 +518,11 @@ mod tests {
     fn test_max_tuple_field_index() {
         let instr = Instruction::GetTupleField(u8::MAX);
         assert_eq!(format!("{}", instr), format!("GET_TUPLE_FIELD {}", u8::MAX));
+    }
+
+    #[test]
+    fn test_max_list_size() {
+        let instr = Instruction::MakeList(u16::MAX);
+        assert_eq!(format!("{}", instr), format!("MAKE_LIST {}", u16::MAX));
     }
 }

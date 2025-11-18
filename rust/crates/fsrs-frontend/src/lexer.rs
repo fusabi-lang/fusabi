@@ -4,7 +4,7 @@
 //! a stream of tokens. The lexer supports:
 //!
 //! - Literals: integers, floats, booleans, strings
-//! - Keywords: let, in, if, then, else, fun, true, false
+//! - Keywords: let, rec, and, in, if, then, else, fun, true, false
 //! - Identifiers: alphanumeric names starting with letter or underscore
 //! - Operators: arithmetic, comparison, logical
 //! - Punctuation: parentheses, arrows
@@ -43,6 +43,10 @@ pub enum Token {
     // Keywords
     /// let keyword
     Let,
+    /// rec keyword (for recursive bindings)
+    Rec,
+    /// and keyword (for mutual recursion)
+    AndKeyword,
     /// in keyword
     In,
     /// if keyword
@@ -105,6 +109,8 @@ impl fmt::Display for Token {
             Token::Ident(s) => write!(f, "Ident({})", s),
             Token::Let => write!(f, "let"),
             Token::In => write!(f, "in"),
+            Token::Rec => write!(f, "rec"),
+            Token::AndKeyword => write!(f, "and"),
             Token::If => write!(f, "if"),
             Token::Then => write!(f, "then"),
             Token::Else => write!(f, "else"),
@@ -332,6 +338,8 @@ impl Lexer {
         let token = match s.as_str() {
             "let" => Token::Let,
             "in" => Token::In,
+            "rec" => Token::Rec,
+            "and" => Token::AndKeyword,
             "if" => Token::If,
             "then" => Token::Then,
             "else" => Token::Else,
@@ -684,14 +692,16 @@ mod tests {
 
     #[test]
     fn test_lex_all_keywords() {
-        let mut lexer = Lexer::new("let in if then else fun");
+        let mut lexer = Lexer::new("let rec and in if then else fun");
         let tokens = lexer.tokenize().unwrap();
         assert_eq!(tokens[0].token, Token::Let);
-        assert_eq!(tokens[1].token, Token::In);
-        assert_eq!(tokens[2].token, Token::If);
-        assert_eq!(tokens[3].token, Token::Then);
-        assert_eq!(tokens[4].token, Token::Else);
-        assert_eq!(tokens[5].token, Token::Fun);
+        assert_eq!(tokens[1].token, Token::Rec);
+        assert_eq!(tokens[2].token, Token::AndKeyword);
+        assert_eq!(tokens[3].token, Token::In);
+        assert_eq!(tokens[4].token, Token::If);
+        assert_eq!(tokens[5].token, Token::Then);
+        assert_eq!(tokens[6].token, Token::Else);
+        assert_eq!(tokens[7].token, Token::Fun);
     }
 
     // ========================================================================
@@ -1031,5 +1041,45 @@ mod tests {
 
         let err3 = LexError::InvalidNumber("123abc".to_string(), Position::new(1, 1, 0));
         assert!(format!("{}", err3).contains("Invalid number"));
+    }
+    // ========================================================================
+    // Let-Rec Keyword Tests (Issue #22)
+    // ========================================================================
+
+    #[test]
+    fn test_lex_keyword_rec() {
+        let mut lexer = Lexer::new("rec");
+        let tokens = lexer.tokenize().unwrap();
+        assert_eq!(tokens[0].token, Token::Rec);
+    }
+
+    #[test]
+    fn test_lex_keyword_and() {
+        let mut lexer = Lexer::new("and");
+        let tokens = lexer.tokenize().unwrap();
+        assert_eq!(tokens[0].token, Token::AndKeyword);
+    }
+
+    #[test]
+    fn test_lex_let_rec_simple() {
+        let mut lexer = Lexer::new("let rec fact = fun n -> n");
+        let tokens = lexer.tokenize().unwrap();
+        assert_eq!(tokens[0].token, Token::Let);
+        assert_eq!(tokens[1].token, Token::Rec);
+        assert_eq!(tokens[2].token, Token::Ident("fact".to_string()));
+        assert_eq!(tokens[3].token, Token::Eq);
+        assert_eq!(tokens[4].token, Token::Fun);
+    }
+
+    #[test]
+    fn test_lex_let_rec_mutual() {
+        let mut lexer = Lexer::new("let rec f = fun x -> x and g = fun y -> y in f");
+        let tokens = lexer.tokenize().unwrap();
+        assert_eq!(tokens[0].token, Token::Let);
+        assert_eq!(tokens[1].token, Token::Rec);
+        assert_eq!(tokens[2].token, Token::Ident("f".to_string()));
+        assert_eq!(tokens[3].token, Token::Eq);
+        assert_eq!(tokens[8].token, Token::AndKeyword);
+        assert_eq!(tokens[9].token, Token::Ident("g".to_string()));
     }
 }

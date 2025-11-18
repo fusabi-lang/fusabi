@@ -565,7 +565,7 @@ mod tests {
 
     #[test]
     fn test_lex_multiple_floats() {
-        let mut lexer = Lexer::new("1.5 2.0 3.14159");
+        let mut lexer = Lexer::new("1.5 2.0 3.15159");
         let tokens = lexer.tokenize().unwrap();
         assert_eq!(tokens.len(), 4);
         assert_eq!(tokens[0].token, Token::Float(1.5));

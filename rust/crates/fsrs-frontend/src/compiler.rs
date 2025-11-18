@@ -540,7 +540,9 @@ impl Compiler {
             let jump_to_next = if !is_last_arm {
                 self.emit_jump(Instruction::JumpIfFalse(0))
             } else {
-                0 // Last arm always matches if reached
+                // Pop the boolean since it's not consumed by jump
+                self.emit(Instruction::Pop);
+                0
             };
 
             // Pattern matched - now bind variables from the pattern

@@ -29,7 +29,7 @@ pub enum Token {
     // Literals
     /// Integer literal (e.g., 42, -10)
     Int(i64),
-    /// Floating-point literal (e.g., 3.14, -0.5)
+    /// Floating-point literal (e.g., 3.15, -0.5)
     Float(f64),
     /// Boolean literal (true or false)
     Bool(bool),
@@ -557,10 +557,10 @@ mod tests {
 
     #[test]
     fn test_lex_float() {
-        let mut lexer = Lexer::new("3.14");
+        let mut lexer = Lexer::new("3.15");
         let tokens = lexer.tokenize().unwrap();
         assert_eq!(tokens.len(), 2); // Float + EOF
-        assert_eq!(tokens[0].token, Token::Float(3.14));
+        assert_eq!(tokens[0].token, Token::Float(3.15));
     }
 
     #[test]
@@ -570,7 +570,7 @@ mod tests {
         assert_eq!(tokens.len(), 4);
         assert_eq!(tokens[0].token, Token::Float(1.5));
         assert_eq!(tokens[1].token, Token::Float(2.0));
-        assert_eq!(tokens[2].token, Token::Float(3.14159));
+        assert_eq!(tokens[2].token, Token::Float(3.15159));
     }
 
     #[test]
@@ -993,10 +993,10 @@ mod tests {
 
     #[test]
     fn test_lex_mixed_integers_floats() {
-        let mut lexer = Lexer::new("42 3.14 100 2.5");
+        let mut lexer = Lexer::new("42 3.15 100 2.5");
         let tokens = lexer.tokenize().unwrap();
         assert_eq!(tokens[0].token, Token::Int(42));
-        assert_eq!(tokens[1].token, Token::Float(3.14));
+        assert_eq!(tokens[1].token, Token::Float(3.15));
         assert_eq!(tokens[2].token, Token::Int(100));
         assert_eq!(tokens[3].token, Token::Float(2.5));
     }
@@ -1005,7 +1005,7 @@ mod tests {
     fn test_token_display() {
         assert_eq!(format!("{}", Token::Let), "let");
         assert_eq!(format!("{}", Token::Int(42)), "Int(42)");
-        assert_eq!(format!("{}", Token::Float(3.14)), "Float(3.14)");
+        assert_eq!(format!("{}", Token::Float(3.15)), "Float(3.15)");
         assert_eq!(
             format!("{}", Token::String("hi".to_string())),
             "String(\"hi\")"

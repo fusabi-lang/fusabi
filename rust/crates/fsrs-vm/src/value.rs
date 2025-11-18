@@ -187,37 +187,37 @@ mod tests {
 
     #[test]
     fn test_is_truthy_bool() {
-        assert_eq!(Value::Bool(true).is_truthy(), true);
-        assert_eq!(Value::Bool(false).is_truthy(), false);
+        assert!(Value::Bool(true).is_truthy());
+        assert!(!Value::Bool(false).is_truthy());
     }
 
     #[test]
     fn test_is_truthy_int() {
-        assert_eq!(Value::Int(1).is_truthy(), true);
-        assert_eq!(Value::Int(-1).is_truthy(), true);
-        assert_eq!(Value::Int(0).is_truthy(), false);
-        assert_eq!(Value::Int(999).is_truthy(), true);
+        assert!(Value::Int(1).is_truthy());
+        assert!(Value::Int(-1).is_truthy());
+        assert!(!Value::Int(0).is_truthy());
+        assert!(Value::Int(999).is_truthy());
     }
 
     #[test]
     fn test_is_truthy_str() {
-        assert_eq!(Value::Str("hello".to_string()).is_truthy(), true);
-        assert_eq!(Value::Str("".to_string()).is_truthy(), false);
+        assert!(Value::Str("hello".to_string()).is_truthy());
+        assert!(!Value::Str("".to_string()).is_truthy());
     }
 
     #[test]
     fn test_is_truthy_unit() {
-        assert_eq!(Value::Unit.is_truthy(), false);
+        assert!(!Value::Unit.is_truthy());
     }
 
     // ========== Unit Check Tests ==========
 
     #[test]
     fn test_is_unit() {
-        assert_eq!(Value::Unit.is_unit(), true);
-        assert_eq!(Value::Int(0).is_unit(), false);
-        assert_eq!(Value::Bool(false).is_unit(), false);
-        assert_eq!(Value::Str("".to_string()).is_unit(), false);
+        assert!(Value::Unit.is_unit());
+        assert!(!Value::Int(0).is_unit());
+        assert!(!Value::Bool(false).is_unit());
+        assert!(!Value::Str("".to_string()).is_unit());
     }
 
     // ========== Clone Tests ==========
@@ -352,7 +352,7 @@ mod tests {
     fn test_empty_string() {
         let val = Value::Str("".to_string());
         assert_eq!(val.as_str(), Some(""));
-        assert_eq!(val.is_truthy(), false);
+        assert!(!val.is_truthy());
     }
 
     #[test]

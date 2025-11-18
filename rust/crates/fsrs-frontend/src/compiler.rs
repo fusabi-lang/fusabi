@@ -413,7 +413,7 @@ mod tests {
 
     #[test]
     fn test_compile_literal_float_unsupported() {
-        let expr = Expr::Lit(Literal::Float(3.14));
+        let expr = Expr::Lit(Literal::Float(3.15));
         let result = Compiler::compile(&expr);
 
         assert!(result.is_err());

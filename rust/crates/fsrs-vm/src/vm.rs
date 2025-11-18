@@ -159,6 +159,52 @@ impl Vm {
                     self.pop()?;
                 }
 
+                Instruction::Dup => {
+                    let value = self.peek()?;
+                    self.push(value.clone());
+                }
+
+                Instruction::CheckInt(expected) => {
+                    let value = self.peek()?;
+                    let matches = matches!(value, Value::Int(n) if *n == expected);
+                    self.push(Value::Bool(matches));
+                }
+
+                Instruction::CheckBool(expected) => {
+                    let value = self.peek()?;
+                    let matches = matches!(value, Value::Bool(b) if *b == expected);
+                    self.push(Value::Bool(matches));
+                }
+
+                Instruction::CheckString(expected) => {
+                    let value = self.peek()?;
+                    let matches = matches!(value, Value::Str(s) if *s == expected);
+                    self.push(Value::Bool(matches));
+                }
+
+                Instruction::CheckTupleLen(expected) => {
+                    let value = self.peek()?;
+                    let matches = if let Value::Tuple(elements) = value {
+                        elements.len() == expected as usize
+                    } else {
+                        false
+                    };
+                    self.push(Value::Bool(matches));
+                }
+
+                Instruction::GetTupleElem(index) => {
+                    let value = self.peek()?;
+                    if let Value::Tuple(elements) = value {
+                        if (index as usize) < elements.len() {
+                            self.push(elements[index as usize].clone());
+                        } else {
+                            return Err(VmError::Runtime("Tuple index out of bounds".into()));
+                        }
+                    } else {
+                        return Err(VmError::Runtime("Not a tuple".into()));
+                    }
+                }
+
                 // Arithmetic operations
                 Instruction::Add => {
                     let b = self.pop_int()?;
@@ -475,15 +521,16 @@ impl Vm {
 
                     self.push(new_arr);
                 }
-                // Unimplemented instructions for Phase 1
-                Instruction::LoadUpvalue(_)
-                | Instruction::StoreUpvalue(_)
-                | Instruction::Call(_)
-                | Instruction::TailCall(_) => {
+                _ => {
                     unimplemented!("Instruction not implemented in Phase 1: {:?}", instruction)
                 }
             }
         }
+    }
+
+    /// Peek at the top of the stack without removing it
+    fn peek(&self) -> Result<&Value, VmError> {
+        self.stack.last().ok_or(VmError::StackUnderflow)
     }
 
     /// Push a value onto the stack

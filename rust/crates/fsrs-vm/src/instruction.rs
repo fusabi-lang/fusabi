@@ -27,6 +27,24 @@ pub enum Instruction {
 
     /// Pop top of stack and discard
     Pop,
+    /// Duplicate top of stack
+    Dup,
+
+    // ===== Pattern Matching Operations =====
+    /// Check if top of stack equals int, push bool
+    CheckInt(i64),
+
+    /// Check if top of stack equals bool, push bool
+    CheckBool(bool),
+
+    /// Check if top of stack equals string, push bool
+    CheckString(String),
+
+    /// Check if top of stack is tuple with N elements, push bool
+    CheckTupleLen(u8),
+
+    /// Get tuple element by index (leaves tuple on stack)
+    GetTupleElem(u8),
 
     // ===== Arithmetic Operations =====
     /// Pop two integers, push sum (a + b)
@@ -141,6 +159,14 @@ impl fmt::Display for Instruction {
             Instruction::LoadUpvalue(idx) => write!(f, "LOAD_UPVALUE {}", idx),
             Instruction::StoreUpvalue(idx) => write!(f, "STORE_UPVALUE {}", idx),
             Instruction::Pop => write!(f, "POP"),
+            Instruction::Dup => write!(f, "DUP"),
+
+            // Pattern matching
+            Instruction::CheckInt(n) => write!(f, "CHECK_INT {}", n),
+            Instruction::CheckBool(b) => write!(f, "CHECK_BOOL {}", b),
+            Instruction::CheckString(s) => write!(f, "CHECK_STRING \"{}\"", s),
+            Instruction::CheckTupleLen(n) => write!(f, "CHECK_TUPLE_LEN {}", n),
+            Instruction::GetTupleElem(idx) => write!(f, "GET_TUPLE_ELEM {}", idx),
 
             // Arithmetic
             Instruction::Add => write!(f, "ADD"),

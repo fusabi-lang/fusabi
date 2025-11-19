@@ -67,6 +67,10 @@ pub enum Token {
     With,
     /// of keyword (for discriminated unions)
     Of,
+    /// open keyword (for importing modules)
+    Open,
+    /// module keyword (for module definitions)
+    Module,
 
     // Operators
     /// + operator
@@ -187,6 +191,8 @@ impl fmt::Display for Token {
             Token::Pipe => write!(f, "|"),
             Token::Underscore => write!(f, "_"),
             Token::Of => write!(f, "of"),
+            Token::Open => write!(f, "open"),
+            Token::Module => write!(f, "module"),
             Token::Eof => write!(f, "EOF"),
         }
     }
@@ -452,6 +458,8 @@ impl Lexer {
             "type" => Token::Type,
             "with" => Token::With,
             "of" => Token::Of,
+            "open" => Token::Open,
+            "module" => Token::Module,
             "true" => Token::Bool(true),
             "false" => Token::Bool(false),
             _ => Token::Ident(s),

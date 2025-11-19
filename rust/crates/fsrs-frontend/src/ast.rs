@@ -943,6 +943,129 @@ impl fmt::Display for Expr {
         }
     }
 }
+// ========================================================================
+// Module System Types (Phase 3)
+// ========================================================================
+
+/// Named module definition with nested items
+///
+/// Represents a module with a name and contained items (bindings, types, nested modules).
+/// Example: module Math = let add x y = x + y
+#[derive(Debug, Clone, PartialEq)]
+pub struct ModuleDef {
+    /// Module name
+    pub name: String,
+    /// Items contained in this module
+    pub items: Vec<ModuleItem>,
+}
+
+impl fmt::Display for ModuleDef {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "module {} = ", self.name)?;
+        for (i, item) in self.items.iter().enumerate() {
+            if i > 0 {
+                writeln!(f)?;
+            }
+            write!(f, "{}", item)?;
+        }
+        Ok(())
+    }
+}
+
+/// Items that can appear inside a module
+#[derive(Debug, Clone, PartialEq)]
+pub enum ModuleItem {
+    /// Let binding: let x = expr
+    Let(String, Expr),
+    /// Recursive let binding: let rec f = expr
+    LetRec(Vec<(String, Expr)>),
+    /// Type definition (record or DU)
+    TypeDef(TypeDefinition),
+    /// Nested module
+    Module(Box<ModuleDef>),
+}
+
+impl fmt::Display for ModuleItem {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            ModuleItem::Let(name, expr) => write!(f, "let {} = {}", name, expr),
+            ModuleItem::LetRec(bindings) => {
+                write!(f, "let rec ")?;
+                for (i, (name, expr)) in bindings.iter().enumerate() {
+                    if i > 0 {
+                        write!(f, " and ")?;
+                    }
+                    write!(f, "{} = {}", name, expr)?;
+                }
+                Ok(())
+            }
+            ModuleItem::TypeDef(typedef) => write!(f, "{}", typedef),
+            ModuleItem::Module(module_def) => write!(f, "{}", module_def),
+        }
+    }
+}
+
+/// Import/Open statement
+///
+/// Represents importing bindings from a module into scope.
+/// Example: open Math
+#[derive(Debug, Clone, PartialEq)]
+pub struct Import {
+    /// Module path (e.g., ["Math", "Geometry"])
+    pub module_path: Vec<String>,
+    /// Whether this is qualified access only (false for "open")
+    pub is_qualified: bool,
+}
+
+impl fmt::Display for Import {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if self.is_qualified {
+            write!(f, "// qualified import: {}", self.module_path.join("."))
+        } else {
+            write!(f, "open {}", self.module_path.join("."))
+        }
+    }
+}
+
+/// Complete program with modules and main expression
+///
+/// Top-level structure representing a complete FSRS program with
+/// module definitions, imports, and an optional main expression.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Program {
+    /// Module definitions
+    pub modules: Vec<ModuleDef>,
+    /// Import statements
+    pub imports: Vec<Import>,
+    /// Main expression to evaluate (if any)
+    pub main_expr: Option<Expr>,
+}
+
+impl fmt::Display for Program {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        for import in &self.imports {
+            writeln!(f, "{}", import)?;
+        }
+        if !self.imports.is_empty() && !self.modules.is_empty() {
+            writeln!(f)?;
+        }
+        for (i, module) in self.modules.iter().enumerate() {
+            if i > 0 {
+                writeln!(f)?;
+                writeln!(f)?;
+            }
+            write!(f, "{}", module)?;
+        }
+        if let Some(ref expr) = self.main_expr {
+            if !self.modules.is_empty() {
+                writeln!(f)?;
+                writeln!(f)?;
+            }
+            write!(f, "{}", expr)?;
+        }
+        Ok(())
+    }
+}
 
 #[cfg(test)]
 mod tests {

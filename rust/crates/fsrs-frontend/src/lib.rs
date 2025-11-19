@@ -15,6 +15,7 @@
 //! - `typed_ast`: Optional typed AST with type annotations
 //! - `span`: Source location tracking for error reporting
 //! - `error`: Error types with beautiful formatting and suggestions
+//! - `modules`: Module system for code organization
 //!
 //! # Example
 //!
@@ -57,17 +58,19 @@ pub mod compiler;
 pub mod error;
 pub mod inference;
 pub mod lexer;
+pub mod modules;
 pub mod parser;
 pub mod span;
 pub mod typed_ast;
 pub mod types;
 
 // Re-export commonly used types for convenience
-pub use ast::{BinOp, Expr, Literal, Pattern};
+pub use ast::{BinOp, Expr, Literal, ModuleDef, ModuleItem, Pattern, Program};
 pub use compiler::{CompileError, CompileOptions, Compiler};
 pub use error::{TypeError, TypeErrorKind};
 pub use inference::TypeInference;
 pub use lexer::{LexError, Lexer, Position, Token, TokenWithPos};
+pub use modules::{Module, ModulePath, ModuleRegistry, TypeDefinition as ModuleTypeDef};
 pub use parser::{ParseError, Parser};
 pub use span::Span;
 pub use typed_ast::{TypedExpr, TypedPattern};

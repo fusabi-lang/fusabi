@@ -7,7 +7,7 @@
 //! - Variables and identifiers
 //! - Let-bindings: `let x = expr in body`
 //! - Multi-parameter functions (curried): `let f x y = expr in body`
-//! - Lambda functions: `fun x -> body`
+//! - Lambda functions: `fun x -> body` and multi-parameter `fun x y -> body`
 //! - Function application: `f x y`
 //! - Binary operations: arithmetic, comparison, logical
 //! - Conditional expressions: `if cond then expr1 else expr2`
@@ -35,7 +35,7 @@
 //! expr       ::= let_expr | if_expr | lambda_expr | or_expr
 //! let_expr   ::= "let" IDENT IDENT* "=" expr "in" expr
 //! if_expr    ::= "if" expr "then" expr "else" expr
-//! lambda_expr::= "fun" IDENT "->" expr
+//! lambda_expr::= "fun" IDENT+ "->" expr
 //! or_expr    ::= and_expr ("||" and_expr)*
 //! and_expr   ::= comp_expr ("&&" comp_expr)*
 //! comp_expr  ::= cons_expr (("=" | "==" | "<>" | "<" | "<=" | ">" | ">=") cons_expr)?
@@ -335,17 +335,37 @@ impl Parser {
         })
     }
 
-    /// Parse lambda expression: fun x -> body
+    /// Parse lambda expression: fun x -> body or fun x y z -> body
+    /// Multi-parameter lambdas are desugared to nested single-parameter lambdas
     fn parse_lambda(&mut self) -> Result<Expr> {
         self.expect_token(Token::Fun)?;
-        let param = self.expect_ident()?;
-        self.expect_token(Token::Arrow)?;
-        let body = self.parse_expr()?;
 
-        Ok(Expr::Lambda {
-            param,
-            body: Box::new(body),
-        })
+        // Parse one or more parameters
+        let mut params = vec![];
+        params.push(self.expect_ident()?);
+
+        // Continue parsing parameters until we hit the arrow
+        while !matches!(self.current_token().token, Token::Arrow) {
+            // Only parse identifiers as parameters
+            if let Token::Ident(_) = &self.current_token().token {
+                params.push(self.expect_ident()?);
+            } else {
+                break;
+            }
+        }
+
+        self.expect_token(Token::Arrow)?;
+        let mut body = self.parse_expr()?;
+
+        // Build nested lambdas from right to left: fun x y -> body becomes fun x -> (fun y -> body)
+        for param in params.into_iter().rev() {
+            body = Expr::Lambda {
+                param,
+                body: Box::new(body),
+            };
+        }
+
+        Ok(body)
     }
 
     /// Parse match expression: match expr with | pat -> expr | ...
@@ -1548,6 +1568,43 @@ mod tests {
         assert!(expr.is_lambda());
         if let Expr::Lambda { body, .. } = expr {
             assert!(body.is_lambda());
+        }
+    }
+
+    #[test]
+    fn test_parse_lambda_multi_param() {
+        // Multi-parameter lambda: fun x y -> x + y
+        let expr = parse("fun x y -> x + y").unwrap();
+        assert!(expr.is_lambda());
+        // Should be desugared to: fun x -> (fun y -> x + y)
+        if let Expr::Lambda { param, body } = expr {
+            assert_eq!(param, "x");
+            assert!(body.is_lambda());
+            if let Expr::Lambda {
+                param: inner_param,
+                body: inner_body,
+            } = *body
+            {
+                assert_eq!(inner_param, "y");
+                assert!(inner_body.is_binop());
+            }
+        }
+    }
+
+    #[test]
+    fn test_parse_lambda_triple_param() {
+        // Triple-parameter lambda: fun x y z -> x + y + z
+        let expr = parse("fun x y z -> x + y + z").unwrap();
+        assert!(expr.is_lambda());
+        // Should be: fun x -> (fun y -> (fun z -> x + y + z))
+        if let Expr::Lambda { param, body } = expr {
+            assert_eq!(param, "x");
+            if let Expr::Lambda { param, body } = *body {
+                assert_eq!(param, "y");
+                if let Expr::Lambda { param, body: _ } = *body {
+                    assert_eq!(param, "z");
+                }
+            }
         }
     }
 

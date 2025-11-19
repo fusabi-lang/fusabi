@@ -90,7 +90,7 @@ let normalizeTitle title =
 ## Project Status
 
 **Version**: 0.2.0-alpha
-**Status**: Phase 2 - Language Features (80% Complete)
+**Status**: Phase 2 - Language Features (90% Complete)
 
 ### Implemented Features
 
@@ -100,9 +100,9 @@ let normalizeTitle title =
 - ✅ Parser with full F# syntax support
 - ✅ Bytecode compiler
 - ✅ Stack-based VM interpreter
-- ✅ Test suite (697+ tests)
+- ✅ Test suite (344+ passing tests, 69 ignored awaiting parser features)
 
-**Phase 2 (Features) - 80% Complete** 🚧
+**Phase 2 (Features) - 90% Complete** 🚧
 - ✅ Closures and first-class functions
 - ✅ Recursive functions (let-rec)
 - ✅ Currying and partial application
@@ -110,13 +110,13 @@ let normalizeTitle title =
 - ✅ Lists with cons-cell implementation (81+ tests)
 - ✅ Arrays with mutable semantics (122+ tests)
 - ✅ Pattern matching (95% coverage, 93+ tests)
-- 🚧 Records (AST + Lexer complete)
-- 🚧 Discriminated unions (in progress)
+- ✅ Records - Full Implementation (12 VM tests, 47 integration tests)
+- ✅ Discriminated Unions - Full Implementation (11 VM tests, 17 integration tests, 35 mixed tests)
 - ⏳ Type inference (ready to start)
 
-**Test Coverage**: 697+ tests, 100% passing (core features)
-**Documentation**: Complete language spec, VM design, 12 example scripts
-**PRs Merged**: 47 total (15 this session)
+**Test Coverage**: 344+ tests passing, 69 ignored (awaiting parser features), 3.6:1 test-to-code ratio
+**Documentation**: Complete language spec, VM design, Records+DUs implementation report, 4 comprehensive example scripts
+**PRs Merged**: 56 total (Records L4, DUs L3, DUs L4, Integration Tests, Gemini Config)
 
 See [ROADMAP.md](docs/ROADMAP.md) for the complete development plan.
 
@@ -188,6 +188,7 @@ Comprehensive documentation is available in the [`docs/`](docs/) directory:
 ### Implementation
 
 - **[CLAUDE_CODE_NOTES.md](docs/CLAUDE_CODE_NOTES.md)** - Detailed implementation tasks
+- **[RECORDS_DUS_IMPLEMENTATION.md](rust/docs/RECORDS_DUS_IMPLEMENTATION.md)** - Records & DUs full implementation report
 - **[RESEARCH_NOTES.md](docs/RESEARCH_NOTES.md)** - VM and embedding research
 - **[NUSHELL_PATTERNS.md](docs/NUSHELL_PATTERNS.md)** - Scripting patterns
 

@@ -610,22 +610,31 @@ impl Parser {
                 // Array indexing: arr.[index] or arr.[index] <- value
                 Token::Dot => {
                     self.advance(); // consume '.'
-                    self.expect_token(Token::LBracket)?;
-                    let index = Box::new(self.parse_expr()?);
-                    self.expect_token(Token::RBracket)?;
+                                    // Check if it's array indexing: .[
+                    if self.match_token(&Token::LBracket) {
+                        let index = Box::new(self.parse_expr()?);
+                        self.expect_token(Token::RBracket)?;
 
-                    // Check for array update: <- value
-                    if self.match_token(&Token::LArrow) {
-                        let value = Box::new(self.parse_expr()?);
-                        expr = Expr::ArrayUpdate {
-                            array: Box::new(expr),
-                            index,
-                            value,
-                        };
+                        // Check for array update: <- value
+                        if self.match_token(&Token::LArrow) {
+                            let value = Box::new(self.parse_expr()?);
+                            expr = Expr::ArrayUpdate {
+                                array: Box::new(expr),
+                                index,
+                                value,
+                            };
+                        } else {
+                            expr = Expr::ArrayIndex {
+                                array: Box::new(expr),
+                                index,
+                            };
+                        }
                     } else {
-                        expr = Expr::ArrayIndex {
-                            array: Box::new(expr),
-                            index,
+                        // Record field access: record.field
+                        let field = self.expect_ident()?;
+                        expr = Expr::RecordAccess {
+                            record: Box::new(expr),
+                            field,
                         };
                     }
                 }
@@ -634,6 +643,48 @@ impl Parser {
         }
 
         Ok(expr)
+    }
+
+    /// Parse record literal: { name = "John"; age = 30 }
+    fn parse_record_literal(&mut self) -> Result<Expr> {
+        self.expect_token(Token::LBrace)?;
+
+        let mut fields = vec![];
+
+        // Parse fields
+        while self.peek() != Some(&Token::RBrace) {
+            let field_name = self.expect_ident()?;
+            self.expect_token(Token::Eq)?;
+            let value = self.parse_expr()?;
+            fields.push((field_name, Box::new(value)));
+
+            // Check for semicolon or closing brace
+            if self.peek() == Some(&Token::Semicolon) {
+                self.advance(); // consume semicolon
+                                // Check for trailing semicolon before }
+                if self.peek() == Some(&Token::RBrace) {
+                    break;
+                }
+            } else if self.peek() == Some(&Token::RBrace) {
+                // No semicolon, but closing brace - this is ok for last field
+                break;
+            } else {
+                // No semicolon and no closing brace - error
+                let tok = self.current_token();
+                return Err(ParseError::UnexpectedToken {
+                    expected: "';' or '}'".to_string(),
+                    found: tok.token.clone(),
+                    pos: tok.pos,
+                });
+            }
+        }
+
+        self.expect_token(Token::RBrace)?;
+
+        Ok(Expr::RecordLiteral {
+            type_name: String::new(), // Inferred by typechecker
+            fields,
+        })
     }
 
     /// Parse primary expression (literals, variables, parenthesized expressions, tuples, lists)
@@ -773,6 +824,10 @@ impl Parser {
                 self.expect_token(Token::PipeRBracket)?;
                 Ok(Expr::Array(elements))
             }
+            Token::LBrace => {
+                // Record literal: { name = "John"; age = 30 }
+                self.parse_record_literal()
+            }
             _ => Err(ParseError::UnexpectedToken {
                 expected: "expression".to_string(),
                 found: tok.token.clone(),
@@ -864,6 +919,7 @@ impl Parser {
                 | Token::LParen
                 | Token::LBracket
                 | Token::LBracketPipe
+                | Token::LBrace
         )
     }
 

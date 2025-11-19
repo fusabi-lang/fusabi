@@ -762,6 +762,11 @@ impl Parser {
         }
     }
 
+    /// Check if an identifier starts with uppercase letter (heuristic for variant constructor)
+    fn is_uppercase_ident(s: &str) -> bool {
+        s.chars().next().is_some_and(|c| c.is_uppercase())
+    }
+
     /// Parse primary expression (literals, variables, parenthesized expressions, tuples, lists)
     fn parse_primary(&mut self) -> Result<Expr> {
         let tok = self.current_token();
@@ -807,9 +812,11 @@ impl Parser {
                 }
 
                 // Check if this could be a variant constructor
-                // Peek ahead to see if there's a '(' which would indicate variant construction
-                if matches!(self.current_token().token, Token::LParen) {
-                    // This looks like a variant constructor call
+                // Use uppercase heuristic: if identifier starts with uppercase, it's likely a variant
+                if Self::is_uppercase_ident(&val)
+                    || matches!(self.current_token().token, Token::LParen)
+                {
+                    // This looks like a variant constructor
                     self.parse_variant_construct(val)
                 } else {
                     // Just a regular variable

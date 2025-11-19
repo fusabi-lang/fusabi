@@ -64,6 +64,8 @@ pub enum Token {
     Type,
     /// with keyword (for record updates)
     With,
+    /// of keyword (for DU variant fields)
+    Of,
 
     // Operators
     /// + operator
@@ -153,6 +155,7 @@ impl fmt::Display for Token {
             Token::Match => write!(f, "match"),
             Token::Type => write!(f, "type"),
             Token::With => write!(f, "with"),
+            Token::Of => write!(f, "of"),
             Token::Plus => write!(f, "+"),
             Token::Minus => write!(f, "-"),
             Token::Star => write!(f, "*"),
@@ -436,6 +439,7 @@ impl Lexer {
             "fun" => Token::Fun,
             "type" => Token::Type,
             "with" => Token::With,
+            "of" => Token::Of,
             "true" => Token::Bool(true),
             "false" => Token::Bool(false),
             _ => Token::Ident(s),

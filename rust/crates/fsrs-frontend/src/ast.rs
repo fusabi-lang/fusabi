@@ -197,13 +197,131 @@ impl fmt::Display for RecordTypeDef {
     }
 }
 
+/// Variant definition in a discriminated union.
+///
+/// Represents a single case/variant in a DU.
+/// Example: Circle of float | Rectangle of float * float
+#[derive(Debug, Clone, PartialEq)]
+pub struct VariantDef {
+    /// Name of the variant (e.g., "Some", "None", "Circle")
+    pub name: String,
+    /// Field types for this variant (empty for simple enums)
+    pub fields: Vec<TypeExpr>,
+}
+
+impl fmt::Display for VariantDef {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.name)?;
+        if !self.fields.is_empty() {
+            write!(f, " of ")?;
+            for (i, field) in self.fields.iter().enumerate() {
+                if i > 0 {
+                    write!(f, " * ")?;
+                }
+                write!(f, "{}", field)?;
+            }
+        }
+        Ok(())
+    }
+}
+
+impl VariantDef {
+    /// Create a new variant with no fields
+    pub fn new_simple(name: String) -> Self {
+        VariantDef {
+            name,
+            fields: vec![],
+        }
+    }
+
+    /// Create a new variant with fields
+    pub fn new(name: String, fields: Vec<TypeExpr>) -> Self {
+        VariantDef { name, fields }
+    }
+
+    /// Returns true if this variant has no fields (simple enum case)
+    pub fn is_simple(&self) -> bool {
+        self.fields.is_empty()
+    }
+
+    /// Returns the number of fields
+    pub fn field_count(&self) -> usize {
+        self.fields.len()
+    }
+}
+
+/// Discriminated union type definition.
+///
+/// Represents a discriminated union (algebraic data type).
+/// Example: type Option = Some of int | None
+#[derive(Debug, Clone, PartialEq)]
+pub struct DuTypeDef {
+    /// Name of the DU type
+    pub name: String,
+    /// Variants/cases of this DU
+    pub variants: Vec<VariantDef>,
+}
+
+impl fmt::Display for DuTypeDef {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "type {} = ", self.name)?;
+        for (i, variant) in self.variants.iter().enumerate() {
+            if i > 0 {
+                write!(f, " | ")?;
+            }
+            write!(f, "{}", variant)?;
+        }
+        Ok(())
+    }
+}
+
+impl DuTypeDef {
+    /// Get all variant names
+    pub fn variant_names(&self) -> Vec<&str> {
+        self.variants.iter().map(|v| v.name.as_str()).collect()
+    }
+
+    /// Find a variant by name
+    pub fn find_variant(&self, name: &str) -> Option<&VariantDef> {
+        self.variants.iter().find(|v| v.name == name)
+    }
+
+    /// Returns true if this is a simple enumeration (all variants have no fields)
+    pub fn is_simple_enum(&self) -> bool {
+        self.variants.iter().all(|v| v.is_simple())
+    }
+
+    /// Returns the number of variants
+    pub fn variant_count(&self) -> usize {
+        self.variants.len()
+    }
+}
+
+/// Type definition variants (Records or Discriminated Unions).
+#[derive(Debug, Clone, PartialEq)]
+pub enum TypeDefinition {
+    /// Record type definition
+    Record(RecordTypeDef),
+    /// Discriminated union type definition
+    Du(DuTypeDef),
+}
+
+impl fmt::Display for TypeDefinition {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            TypeDefinition::Record(r) => write!(f, "{}", r),
+            TypeDefinition::Du(du) => write!(f, "{}", du),
+        }
+    }
+}
+
 /// Top-level declaration in a module.
 ///
 /// Represents declarations that can appear at the top level of a module.
 #[derive(Debug, Clone, PartialEq)]
 pub enum Declaration {
-    /// Type definition (e.g., record type)
-    TypeDef(RecordTypeDef),
+    /// Type definition (record or discriminated union)
+    TypeDef(TypeDefinition),
     /// Let-binding declaration
     LetBinding {
         name: String,
@@ -250,7 +368,7 @@ impl fmt::Display for Module {
 
 /// Pattern in a match expression.
 ///
-/// Patterns can match literals, variables, wildcards, and tuples.
+/// Patterns can match literals, variables, wildcards, tuples, and DU variants.
 /// Issue #27 supports basic patterns; Issue #28 will add lists/arrays.
 #[derive(Debug, Clone, PartialEq)]
 pub enum Pattern {
@@ -262,6 +380,13 @@ pub enum Pattern {
     Literal(Literal),
     /// Tuple pattern ((p1, p2, ...)) - matches tuples
     Tuple(Vec<Pattern>),
+    /// Variant pattern (Some(x), Left, Circle(r)) - matches DU constructors
+    Variant {
+        /// Variant constructor name (e.g., "Some", "None", "Circle")
+        variant: String,
+        /// Nested patterns for variant fields (empty for simple variants)
+        patterns: Vec<Pattern>,
+    },
 }
 
 impl fmt::Display for Pattern {
@@ -279,6 +404,20 @@ impl fmt::Display for Pattern {
                     write!(f, "{}", pat)?;
                 }
                 write!(f, ")")
+            }
+            Pattern::Variant { variant, patterns } => {
+                write!(f, "{}", variant)?;
+                if !patterns.is_empty() {
+                    write!(f, "(")?;
+                    for (i, pat) in patterns.iter().enumerate() {
+                        if i > 0 {
+                            write!(f, ", ")?;
+                        }
+                        write!(f, "{}", pat)?;
+                    }
+                    write!(f, ")")?;
+                }
+                Ok(())
             }
         }
     }
@@ -325,6 +464,19 @@ impl Pattern {
     pub fn as_tuple(&self) -> Option<&Vec<Pattern>> {
         match self {
             Pattern::Tuple(patterns) => Some(patterns),
+            _ => None,
+        }
+    }
+
+    /// Returns true if this pattern is a variant.
+    pub fn is_variant(&self) -> bool {
+        matches!(self, Pattern::Variant { .. })
+    }
+
+    /// Returns the variant name and patterns if this is a Variant, otherwise None.
+    pub fn as_variant(&self) -> Option<(&str, &Vec<Pattern>)> {
+        match self {
+            Pattern::Variant { variant, patterns } => Some((variant, patterns)),
             _ => None,
         }
     }
@@ -464,6 +616,16 @@ pub enum Expr {
         record: Box<Expr>,
         fields: RecordFields, // Fields to update
     },
+
+    /// Variant constructor (e.g., Some(42), Left, Circle(10.0))
+    VariantConstruct {
+        /// Type name (filled by typechecker, may be empty during parsing)
+        type_name: String,
+        /// Variant name (e.g., "Some", "None", "Circle")
+        variant: String,
+        /// Field values for this variant (empty for simple variants)
+        fields: Vec<Box<Expr>>,
+    },
 }
 
 /// Type alias for record field list: (field_name, value_expression)
@@ -568,6 +730,11 @@ impl Expr {
     /// Returns true if this expression is a record update.
     pub fn is_record_update(&self) -> bool {
         matches!(self, Expr::RecordUpdate { .. })
+    }
+
+    /// Returns true if this expression is a variant constructor.
+    pub fn is_variant_construct(&self) -> bool {
+        matches!(self, Expr::VariantConstruct { .. })
     }
 
     /// Returns the variable name if this is a Var, otherwise None.
@@ -754,6 +921,24 @@ impl fmt::Display for Expr {
                     write!(f, "{} = {}", field_name, field_expr)?;
                 }
                 write!(f, " }})")
+            }
+            Expr::VariantConstruct {
+                type_name: _,
+                variant,
+                fields,
+            } => {
+                write!(f, "{}", variant)?;
+                if !fields.is_empty() {
+                    write!(f, "(")?;
+                    for (i, field_expr) in fields.iter().enumerate() {
+                        if i > 0 {
+                            write!(f, ", ")?;
+                        }
+                        write!(f, "{}", field_expr)?;
+                    }
+                    write!(f, ")")?;
+                }
+                Ok(())
             }
         }
     }
@@ -1004,10 +1189,10 @@ mod tests {
 
     #[test]
     fn test_declaration_typedef() {
-        let decl = Declaration::TypeDef(RecordTypeDef {
+        let decl = Declaration::TypeDef(TypeDefinition::Record(RecordTypeDef {
             name: "Person".to_string(),
             fields: vec![("name".to_string(), TypeExpr::Named("string".to_string()))],
-        });
+        }));
         assert!(matches!(decl, Declaration::TypeDef(_)));
         assert_eq!(format!("{}", decl), "type Person = { name: string }");
     }
@@ -1039,10 +1224,10 @@ mod tests {
 
     #[test]
     fn test_declaration_clone() {
-        let decl1 = Declaration::TypeDef(RecordTypeDef {
+        let decl1 = Declaration::TypeDef(TypeDefinition::Record(RecordTypeDef {
             name: "Person".to_string(),
             fields: vec![],
-        });
+        }));
         let decl2 = decl1.clone();
         assert_eq!(decl1, decl2);
     }
@@ -1063,10 +1248,12 @@ mod tests {
     #[test]
     fn test_module_single_typedef() {
         let module = Module {
-            declarations: vec![Declaration::TypeDef(RecordTypeDef {
-                name: "Person".to_string(),
-                fields: vec![("name".to_string(), TypeExpr::Named("string".to_string()))],
-            })],
+            declarations: vec![Declaration::TypeDef(TypeDefinition::Record(
+                RecordTypeDef {
+                    name: "Person".to_string(),
+                    fields: vec![("name".to_string(), TypeExpr::Named("string".to_string()))],
+                },
+            ))],
         };
         assert_eq!(module.declarations.len(), 1);
         assert_eq!(format!("{}", module), "type Person = { name: string }");
@@ -1076,10 +1263,10 @@ mod tests {
     fn test_module_multiple_declarations() {
         let module = Module {
             declarations: vec![
-                Declaration::TypeDef(RecordTypeDef {
+                Declaration::TypeDef(TypeDefinition::Record(RecordTypeDef {
                     name: "Person".to_string(),
                     fields: vec![("name".to_string(), TypeExpr::Named("string".to_string()))],
-                }),
+                })),
                 Declaration::LetBinding {
                     name: "john".to_string(),
                     params: vec![],

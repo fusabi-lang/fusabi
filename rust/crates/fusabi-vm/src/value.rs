@@ -1,10 +1,14 @@
 // Fusabi VM Value Representation
 // Defines runtime values for the bytecode VM
 
+use crate::closure::Closure;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::fmt;
 use std::rc::Rc;
+
+#[cfg(feature = "serde")]
+use serde::{Serialize, Deserialize, Serializer, Deserializer};
 
 /// Runtime value representation for the Fusabi VM
 #[derive(Debug, Clone, PartialEq)]
@@ -35,6 +39,8 @@ pub enum Value {
         variant_name: String,
         fields: Vec<Value>,
     },
+    /// Closure - a function with captured variables
+    Closure(Rc<Closure>),
 }
 
 impl Value {
@@ -51,6 +57,7 @@ impl Value {
             Value::Array(_) => "array",
             Value::Record(_) => "record",
             Value::Variant { .. } => "variant",
+            Value::Closure(_) => "closure",
         }
     }
 
@@ -116,6 +123,7 @@ impl Value {
             Value::Array(arr) => !arr.borrow().is_empty(),
             Value::Record(fields) => !fields.borrow().is_empty(),
             Value::Variant { .. } => true,
+            Value::Closure(_) => true,
         }
     }
 
@@ -147,6 +155,21 @@ impl Value {
     /// Checks if the value is a Record
     pub fn is_record(&self) -> bool {
         matches!(self, Value::Record(_))
+    }
+
+    /// Checks if the value is a Closure
+    pub fn is_closure(&self) -> bool {
+        matches!(self, Value::Closure(_))
+    }
+
+    /// Attempts to extract a closure reference from the value
+    /// Returns Some(Rc<Closure>) if the value is Closure, None otherwise
+    pub fn as_closure(&self) -> Option<Rc<Closure>> {
+        if let Value::Closure(closure) = self {
+            Some(closure.clone())
+        } else {
+            None
+        }
     }
 
     /// Attempts to extract an array reference from the value
@@ -360,6 +383,12 @@ impl Value {
                 tail: Box::new(acc),
             })
     }
+
+    /// Convert a cons list to a vector of values
+    /// Returns None if the list is malformed (tail is not Nil or Cons)
+    pub fn cons_to_vec(list: &Value) -> Option<Vec<Value>> {
+        list.list_to_vec()
+    }
 }
 
 impl fmt::Display for Value {
@@ -448,6 +477,10 @@ impl fmt::Display for Value {
                     write!(f, ")")?;
                 }
                 Ok(())
+            }
+            Value::Closure(closure) => {
+                // Pretty-print as <closure> or <closure name>
+                write!(f, "{}", closure)
             }
         }
     }
@@ -2034,5 +2067,171 @@ mod tests {
             ],
         };
         assert_eq!(format!("{}", variant), "Data(42, hello, true)");
+    }
+}
+
+// ===== Serialization Support =====
+
+#[cfg(feature = "serde")]
+impl Serialize for Value {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        use serde::ser::SerializeStruct;
+
+        match self {
+            Value::Int(n) => {
+                let mut state = serializer.serialize_struct("Value", 2)?;
+                state.serialize_field("type", "Int")?;
+                state.serialize_field("value", n)?;
+                state.end()
+            }
+            Value::Bool(b) => {
+                let mut state = serializer.serialize_struct("Value", 2)?;
+                state.serialize_field("type", "Bool")?;
+                state.serialize_field("value", b)?;
+                state.end()
+            }
+            Value::Str(s) => {
+                let mut state = serializer.serialize_struct("Value", 2)?;
+                state.serialize_field("type", "Str")?;
+                state.serialize_field("value", s)?;
+                state.end()
+            }
+            Value::Unit => {
+                let mut state = serializer.serialize_struct("Value", 1)?;
+                state.serialize_field("type", "Unit")?;
+                state.end()
+            }
+            Value::Tuple(elements) => {
+                let mut state = serializer.serialize_struct("Value", 2)?;
+                state.serialize_field("type", "Tuple")?;
+                state.serialize_field("elements", elements)?;
+                state.end()
+            }
+            Value::Cons { head, tail } => {
+                let mut state = serializer.serialize_struct("Value", 3)?;
+                state.serialize_field("type", "Cons")?;
+                state.serialize_field("head", head)?;
+                state.serialize_field("tail", tail)?;
+                state.end()
+            }
+            Value::Nil => {
+                let mut state = serializer.serialize_struct("Value", 1)?;
+                state.serialize_field("type", "Nil")?;
+                state.end()
+            }
+            // Arrays and Records are runtime values that should not be in constants
+            // We serialize them as empty/unit for safety
+            Value::Array(_) => {
+                let mut state = serializer.serialize_struct("Value", 1)?;
+                state.serialize_field("type", "Unit")?;
+                state.end()
+            }
+            Value::Record(_) => {
+                let mut state = serializer.serialize_struct("Value", 1)?;
+                state.serialize_field("type", "Unit")?;
+                state.end()
+            }
+            Value::Variant { type_name, variant_name, fields } => {
+                let mut state = serializer.serialize_struct("Value", 4)?;
+                state.serialize_field("type", "Variant")?;
+                state.serialize_field("type_name", type_name)?;
+                state.serialize_field("variant_name", variant_name)?;
+                state.serialize_field("fields", fields)?;
+                state.end()
+            }
+            // Closures are runtime values that cannot be serialized
+            // We serialize them as Unit for safety
+            Value::Closure(_) => {
+                let mut state = serializer.serialize_struct("Value", 1)?;
+                state.serialize_field("type", "Unit")?;
+                state.end()
+            }
+        }
+    }
+}
+
+#[cfg(feature = "serde")]
+impl<'de> Deserialize<'de> for Value {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        use serde::de::{self, Visitor, MapAccess};
+
+        struct ValueVisitor;
+
+        impl<'de> Visitor<'de> for ValueVisitor {
+            type Value = Value;
+
+            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+                formatter.write_str("a Value enum")
+            }
+
+            fn visit_map<A>(self, mut map: A) -> Result<Value, A::Error>
+            where
+                A: MapAccess<'de>,
+            {
+                let mut value_type: Option<String> = None;
+                let mut int_value: Option<i64> = None;
+                let mut bool_value: Option<bool> = None;
+                let mut str_value: Option<String> = None;
+                let mut tuple_elements: Option<Vec<Value>> = None;
+                let mut cons_head: Option<Box<Value>> = None;
+                let mut cons_tail: Option<Box<Value>> = None;
+                let mut variant_type_name: Option<String> = None;
+                let mut variant_name: Option<String> = None;
+                let mut variant_fields: Option<Vec<Value>> = None;
+
+                while let Some(key) = map.next_key::<String>()? {
+                    match key.as_str() {
+                        "type" => value_type = Some(map.next_value()?),
+                        "value" => {
+                            // This could be different types based on the type field
+                            if let Some(ref t) = value_type {
+                                match t.as_str() {
+                                    "Int" => int_value = Some(map.next_value()?),
+                                    "Bool" => bool_value = Some(map.next_value()?),
+                                    "Str" => str_value = Some(map.next_value()?),
+                                    _ => return Err(de::Error::custom("unexpected value type")),
+                                }
+                            }
+                        }
+                        "elements" => tuple_elements = Some(map.next_value()?),
+                        "head" => cons_head = Some(map.next_value()?),
+                        "tail" => cons_tail = Some(map.next_value()?),
+                        "type_name" => variant_type_name = Some(map.next_value()?),
+                        "variant_name" => variant_name = Some(map.next_value()?),
+                        "fields" => variant_fields = Some(map.next_value()?),
+                        _ => { let _: de::IgnoredAny = map.next_value()?; }
+                    }
+                }
+
+                let value_type = value_type.ok_or_else(|| de::Error::missing_field("type"))?;
+
+                match value_type.as_str() {
+                    "Int" => Ok(Value::Int(int_value.ok_or_else(|| de::Error::missing_field("value"))?)),
+                    "Bool" => Ok(Value::Bool(bool_value.ok_or_else(|| de::Error::missing_field("value"))?)),
+                    "Str" => Ok(Value::Str(str_value.ok_or_else(|| de::Error::missing_field("value"))?)),
+                    "Unit" => Ok(Value::Unit),
+                    "Tuple" => Ok(Value::Tuple(tuple_elements.ok_or_else(|| de::Error::missing_field("elements"))?)),
+                    "Cons" => Ok(Value::Cons {
+                        head: cons_head.ok_or_else(|| de::Error::missing_field("head"))?,
+                        tail: cons_tail.ok_or_else(|| de::Error::missing_field("tail"))?,
+                    }),
+                    "Nil" => Ok(Value::Nil),
+                    "Variant" => Ok(Value::Variant {
+                        type_name: variant_type_name.ok_or_else(|| de::Error::missing_field("type_name"))?,
+                        variant_name: variant_name.ok_or_else(|| de::Error::missing_field("variant_name"))?,
+                        fields: variant_fields.ok_or_else(|| de::Error::missing_field("fields"))?,
+                    }),
+                    _ => Err(de::Error::custom(format!("unknown value type: {}", value_type))),
+                }
+            }
+        }
+
+        deserializer.deserialize_map(ValueVisitor)
     }
 }

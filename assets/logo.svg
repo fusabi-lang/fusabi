@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100" height="100">
+  <defs>
+    <linearGradient id="wasabiGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#99CC33;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#78A659;stop-opacity:1" />
+    </linearGradient>
+    <filter id="shadow">
+      <feDropShadow dx="0" dy="2" stdDeviation="3" flood-opacity="0.2"/>
+    </filter>
+  </defs>
+
+  <!-- Background circle (optional, remove if transparent) -->
+  <!-- <circle cx="50" cy="50" r="45" fill="#1E1E1E" filter="url(#shadow)"/> -->
+
+  <!-- Abstract F shape merging with leaf/wasabi dollop -->
+  <!-- Vertical stem of F -->
+  <rect x="25" y="25" width="8" height="50" fill="url(#wasabiGradient)" rx="2"/>
+
+  <!-- Top horizontal bar of F -->
+  <rect x="25" y="25" width="35" height="8" fill="url(#wasabiGradient)" rx="2"/>
+
+  <!-- Middle horizontal bar of F (shorter) -->
+  <rect x="25" y="45" width="25" height="8" fill="url(#wasabiGradient)" rx="2"/>
+
+  <!-- Organic leaf shape extending from F -->
+  <path d="M 60 30 Q 70 35 75 45 T 70 60 Q 65 65 58 62 Q 55 55 55 48 Q 55 38 60 30 Z"
+        fill="url(#wasabiGradient)"
+        opacity="0.9"/>
+
+  <!-- Small accent dollop (wasabi blob) -->
+  <ellipse cx="65" cy="48" rx="8" ry="12"
+           fill="#99CC33"
+           opacity="0.7"
+           transform="rotate(-15 65 48)"/>
+
+  <!-- Highlight accent -->
+  <ellipse cx="67" cy="44" rx="2" ry="3"
+           fill="#F0F0F0"
+           opacity="0.6"/>
+</svg>

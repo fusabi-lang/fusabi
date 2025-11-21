@@ -2,11 +2,12 @@
 // Enables Rust applications to register native functions callable from Fusabi scripts
 
 use crate::value::Value;
-use crate::vm::VmError;
+use crate::vm::{Vm, VmError};
 use std::collections::HashMap;
 
-/// Host function signature - takes a slice of values and returns a value or error
-pub type HostFn = Box<dyn Fn(&[Value]) -> Result<Value, VmError> + Send + Sync>;
+/// Host function signature - takes a mutable VM reference and slice of values, returns a value or error
+/// The VM reference enables re-entrant calls back into the VM for higher-order functions
+pub type HostFn = Box<dyn Fn(&mut Vm, &[Value]) -> Result<Value, VmError> + Send + Sync>;
 
 /// Registry for host functions that can be called from Fusabi scripts
 pub struct HostRegistry {
@@ -27,9 +28,9 @@ impl HostRegistry {
     /// ```
     /// # use fusabi_vm::host::HostRegistry;
     /// # use fusabi_vm::value::Value;
-    /// # use fusabi_vm::vm::VmError;
+    /// # use fusabi_vm::vm::{Vm, VmError};
     /// let mut registry = HostRegistry::new();
-    /// registry.register("add", |args| {
+    /// registry.register("add", |_vm, args| {
     ///     if args.len() != 2 {
     ///         return Err(VmError::Runtime("add expects 2 arguments".into()));
     ///     }
@@ -40,7 +41,7 @@ impl HostRegistry {
     /// ```
     pub fn register<F>(&mut self, name: &str, f: F)
     where
-        F: Fn(&[Value]) -> Result<Value, VmError> + Send + Sync + 'static,
+        F: Fn(&mut Vm, &[Value]) -> Result<Value, VmError> + Send + Sync + 'static,
     {
         self.functions.insert(name.to_string(), Box::new(f));
     }
@@ -51,7 +52,7 @@ impl HostRegistry {
         F: Fn() -> Result<Value, VmError> + Send + Sync + 'static,
     {
         let name_owned = name.to_string();
-        self.register(name, move |args| {
+        self.register(name, move |_vm, args| {
             if !args.is_empty() {
                 return Err(VmError::Runtime(format!(
                     "{} expects 0 arguments, got {}",
@@ -69,7 +70,7 @@ impl HostRegistry {
         F: Fn(Value) -> Result<Value, VmError> + Send + Sync + 'static,
     {
         let name_owned = name.to_string();
-        self.register(name, move |args| {
+        self.register(name, move |_vm, args| {
             if args.len() != 1 {
                 return Err(VmError::Runtime(format!(
                     "{} expects 1 argument, got {}",
@@ -87,7 +88,7 @@ impl HostRegistry {
         F: Fn(Value, Value) -> Result<Value, VmError> + Send + Sync + 'static,
     {
         let name_owned = name.to_string();
-        self.register(name, move |args| {
+        self.register(name, move |_vm, args| {
             if args.len() != 2 {
                 return Err(VmError::Runtime(format!(
                     "{} expects 2 arguments, got {}",
@@ -105,7 +106,7 @@ impl HostRegistry {
         F: Fn(Value, Value, Value) -> Result<Value, VmError> + Send + Sync + 'static,
     {
         let name_owned = name.to_string();
-        self.register(name, move |args| {
+        self.register(name, move |_vm, args| {
             if args.len() != 3 {
                 return Err(VmError::Runtime(format!(
                     "{} expects 3 arguments, got {}",
@@ -118,12 +119,13 @@ impl HostRegistry {
     }
 
     /// Call a registered host function
-    pub fn call(&self, name: &str, args: &[Value]) -> Result<Value, VmError> {
+    /// Now takes a mutable VM reference to pass to the host function
+    pub fn call(&self, name: &str, vm: &mut Vm, args: &[Value]) -> Result<Value, VmError> {
         let f = self
             .functions
             .get(name)
             .ok_or_else(|| VmError::Runtime(format!("Undefined host function: {}", name)))?;
-        f(args)
+        f(vm, args)
     }
 
     /// Check if a function is registered

@@ -24,50 +24,92 @@
 //! fus --help
 //! ```
 
+use colored::*;
 use fusabi_demo::{run_file, run_file_with_disasm, run_source, run_source_with_disasm};
 use std::env;
 use std::process;
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
-const HELP_TEXT: &str = r#"
-Fusabi - Small. Potent. Functional.
 
-USAGE:
+/// Print ASCII banner with brand colors
+fn print_banner() {
+    println!(
+        r#"
+     {}
+    {} {}  Fusabi v{}
+     {}   Small. Potent. Functional.
+        "#,
+        "/ \\".truecolor(153, 204, 51),
+        "(".truecolor(153, 204, 51),
+        "F".truecolor(153, 204, 51).bold(),
+        ")".truecolor(153, 204, 51),
+        VERSION,
+        "\\_/".truecolor(153, 204, 51)
+    );
+}
+
+/// Print help text with colorization
+fn print_help() {
+    print_banner();
+    println!(
+        r#"
+{}
     fus <COMMAND> [OPTIONS] [FILE]
     fus run -e <EXPRESSION>
 
-COMMANDS:
-    run                 JIT execution of .fsx script (default)
-    grind               Compile script to .fzb bytecode
-    root                Package manager (coming soon)
+{}
+    {}                 JIT execution of .fsx script (default)
+    {}               Compile script to .fzb bytecode
+    {}                Package manager (coming soon)
 
-OPTIONS:
-    -h, --help          Show this help message
-    -v, --version       Show version information
-    -e, --eval <EXPR>   Evaluate an expression directly (run mode only)
-    -d, --disasm        Show bytecode disassembly before execution
+{}
+    {}          Show this help message
+    {}       Show version information
+    {}   Evaluate an expression directly (run mode only)
+    {}        Show bytecode disassembly before execution
 
-ARGUMENTS:
-    FILE                Path to .fsx script file
+{}
+    {}                Path to .fsx script file
 
-EXAMPLES:
-    # JIT execute a script
+{}
+    {} JIT execute a script
     fus run examples/arithmetic.fsx
 
-    # Compile to bytecode
+    {} Compile to bytecode
     fus grind examples/arithmetic.fsx
 
-    # Evaluate an expression
+    {} Evaluate an expression
     fus run -e "let x = 10 in x + 5"
 
-    # Show bytecode disassembly
+    {} Show bytecode disassembly
     fus run --disasm examples/conditionals.fsx
 
-    # Package manager (placeholder)
+    {} Package manager (placeholder)
     fus root install some-package
 
-For more information, see: https://github.com/fusabi-lang/fusabi
-"#;
+For more information, see: {}
+"#,
+        "USAGE:".bright_green().bold(),
+        "COMMANDS:".bright_green().bold(),
+        "run".truecolor(153, 204, 51),
+        "grind".truecolor(153, 204, 51),
+        "root".truecolor(153, 204, 51),
+        "OPTIONS:".bright_green().bold(),
+        "-h, --help".truecolor(153, 153, 153),
+        "-v, --version".truecolor(153, 153, 153),
+        "-e, --eval <EXPR>".truecolor(153, 153, 153),
+        "-d, --disasm".truecolor(153, 153, 153),
+        "ARGUMENTS:".bright_green().bold(),
+        "FILE".truecolor(153, 153, 153),
+        "EXAMPLES:".bright_green().bold(),
+        "#".truecolor(153, 153, 153),
+        "#".truecolor(153, 153, 153),
+        "#".truecolor(153, 153, 153),
+        "#".truecolor(153, 153, 153),
+        "#".truecolor(153, 153, 153),
+        "https://github.com/fusabi-lang/fusabi".truecolor(153, 204, 51)
+    );
+}
 
 struct Config {
     mode: Mode,
@@ -169,11 +211,11 @@ fn parse_args() -> Result<Config, String> {
 fn run(config: Config) -> Result<(), Box<dyn std::error::Error>> {
     match config.mode {
         Mode::Help => {
-            print!("{}", HELP_TEXT);
+            print_help();
             Ok(())
         }
         Mode::Version => {
-            println!("fus version {}", VERSION);
+            print_banner();
             Ok(())
         }
         Mode::Eval(expr) => {
@@ -182,7 +224,7 @@ fn run(config: Config) -> Result<(), Box<dyn std::error::Error>> {
             } else {
                 run_source(&expr)?
             };
-            println!("{}", result);
+            println!("{} {}", "✅".bright_green(), result);
             Ok(())
         }
         Mode::RunFile(path) => {
@@ -191,25 +233,55 @@ fn run(config: Config) -> Result<(), Box<dyn std::error::Error>> {
             } else {
                 run_file(&path)?
             };
-            println!("{}", result);
+            println!("{} {}", "✅".bright_green(), result);
             Ok(())
         }
         Mode::Grind(path) => {
-            println!("Compiling {} to bytecode...", path);
-            println!("Feature coming soon: .fzb bytecode compilation");
-            println!("For now, use 'fus run {}' for JIT execution", path);
+            println!(
+                "{} Compiling {} to bytecode...",
+                "🔥".bright_yellow(),
+                path.truecolor(153, 204, 51).bold()
+            );
+            println!(
+                "{} Feature coming soon: .fzb bytecode compilation",
+                "⚠️ ".yellow()
+            );
+            println!(
+                "{} For now, use {} for JIT execution",
+                "💡".truecolor(153, 153, 153),
+                format!("fus run {}", path).truecolor(153, 204, 51)
+            );
             Ok(())
         }
         Mode::Root(subcommands) => {
-            println!("Fusabi Package Manager - Coming Soon");
+            println!(
+                "{} Fusabi Package Manager - Coming Soon",
+                "🟢".bright_green()
+            );
             if !subcommands.is_empty() {
-                println!("Requested: fus root {}", subcommands.join(" "));
+                println!(
+                    "{} Requested: {}",
+                    "💡".truecolor(153, 153, 153),
+                    format!("fus root {}", subcommands.join(" ")).truecolor(153, 204, 51)
+                );
             }
-            println!("\nPlanned features:");
-            println!("  - fus root install <package>  # Install package");
-            println!("  - fus root search <query>     # Search packages");
-            println!("  - fus root update             # Update packages");
-            println!("  - fus root init               # Initialize project");
+            println!("\n{}:", "Planned features".bright_green().bold());
+            println!(
+                "  {} fus root install <package>  # Install package",
+                "•".truecolor(153, 204, 51)
+            );
+            println!(
+                "  {} fus root search <query>     # Search packages",
+                "•".truecolor(153, 204, 51)
+            );
+            println!(
+                "  {} fus root update             # Update packages",
+                "•".truecolor(153, 204, 51)
+            );
+            println!(
+                "  {} fus root init               # Initialize project",
+                "•".truecolor(153, 204, 51)
+            );
             Ok(())
         }
     }
@@ -219,14 +291,18 @@ fn main() {
     let config = match parse_args() {
         Ok(config) => config,
         Err(err) => {
-            eprintln!("Error: {}", err);
-            eprintln!("Try 'fus --help' for more information.");
+            eprintln!("{} {}", "❌".red().bold(), err.truecolor(183, 65, 14));
+            eprintln!(
+                "{} Try {} for more information.",
+                "💡".truecolor(153, 153, 153),
+                "fus --help".truecolor(153, 204, 51)
+            );
             process::exit(1);
         }
     };
 
     if let Err(err) = run(config) {
-        eprintln!("Error: {}", err);
+        eprintln!("{} {}", "❌".red().bold(), err.truecolor(183, 65, 14));
         process::exit(1);
     }
 }
@@ -242,8 +318,14 @@ mod tests {
     }
 
     #[test]
-    #[allow(clippy::const_is_empty)]
-    fn test_help_text_not_empty() {
-        assert!(!HELP_TEXT.is_empty());
+    fn test_banner_prints() {
+        // This just ensures the banner function doesn't panic
+        print_banner();
+    }
+
+    #[test]
+    fn test_help_prints() {
+        // This just ensures the help function doesn't panic
+        print_help();
     }
 }

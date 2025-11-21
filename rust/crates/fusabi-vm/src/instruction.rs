@@ -3,11 +3,15 @@
 
 use std::fmt;
 
+#[cfg(feature = "serde")]
+use serde::{Serialize, Deserialize};
+
 /// Bytecode instruction for the Fusabi VM
 ///
 /// The VM is stack-based, with instructions operating on a value stack
 /// and accessing locals, constants, and upvalues.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub enum Instruction {
     // ===== Stack Operations =====
     /// Push constants[idx] onto stack

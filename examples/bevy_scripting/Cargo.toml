@@ -1,0 +1,14 @@
+[package]
+name = "bevy-scripting-example"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+bevy = "0.12"
+fusabi = { path = "../../rust/crates/fusabi" }
+fusabi-vm = { path = "../../rust/crates/fusabi-vm" }
+fusabi-frontend = { path = "../../rust/crates/fusabi-frontend" }
+
+[[bin]]
+name = "bevy_scripting"
+path = "src/main.rs"

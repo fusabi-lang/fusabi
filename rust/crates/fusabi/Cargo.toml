@@ -16,3 +16,4 @@ path = "src/lib.rs"
 [dependencies]
 fusabi-frontend = { path = "../fusabi-frontend" }
 fusabi-vm = { path = "../fusabi-vm" }
+colored = "2.1"

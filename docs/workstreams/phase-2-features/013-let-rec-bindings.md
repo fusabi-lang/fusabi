@@ -39,14 +39,14 @@ Frontend (Developer 1)
 ## Technical Specification
 
 ### File Locations
-- `rust/crates/fsrs-frontend/src/ast.rs` - AST extension
-- `rust/crates/fsrs-frontend/src/parser.rs` - Parser support
-- `rust/crates/fsrs-frontend/src/compiler.rs` - Compilation
+- `rust/crates/fusabi-frontend/src/ast.rs` - AST extension
+- `rust/crates/fusabi-frontend/src/parser.rs` - Parser support
+- `rust/crates/fusabi-frontend/src/compiler.rs` - Compilation
 
 ### AST Extension
 
 ```rust
-// rust/crates/fsrs-frontend/src/ast.rs
+// rust/crates/fusabi-frontend/src/ast.rs
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Expr {
@@ -72,7 +72,7 @@ pub enum Expr {
 ### Parser Extension
 
 ```rust
-// rust/crates/fsrs-frontend/src/parser.rs
+// rust/crates/fusabi-frontend/src/parser.rs
 
 impl Parser {
     fn parse_let(&mut self) -> Result<Expr, ParseError> {
@@ -124,7 +124,7 @@ impl Parser {
 ### Compiler Extension
 
 ```rust
-// rust/crates/fsrs-frontend/src/compiler.rs
+// rust/crates/fusabi-frontend/src/compiler.rs
 
 impl Compiler {
     fn compile_expr(&mut self, expr: &Expr) -> Result<(), CompileError> {
@@ -253,7 +253,7 @@ impl Compiler {
 ### Unit Tests - AST
 
 ```rust
-// rust/crates/fsrs-frontend/src/ast.rs
+// rust/crates/fusabi-frontend/src/ast.rs
 
 #[cfg(test)]
 mod tests {
@@ -277,7 +277,7 @@ mod tests {
 ### Unit Tests - Parser
 
 ```rust
-// rust/crates/fsrs-frontend/src/parser.rs
+// rust/crates/fusabi-frontend/src/parser.rs
 
 #[cfg(test)]
 mod tests {
@@ -377,7 +377,7 @@ fn test_recursive_closure() {
 ### Example Scripts
 
 ```fsharp
-// examples/recursion/factorial.fsrs
+// examples/recursion/factorial.fsx
 
 // Classic recursive factorial
 let rec factorial n =
@@ -396,7 +396,7 @@ let factorial n = factorialTail n 1
 ```
 
 ```fsharp
-// examples/recursion/list-processing.fsrs
+// examples/recursion/list-processing.fsx
 
 // Recursive list length
 let rec length list =
@@ -426,7 +426,7 @@ let rec filter pred list =
 ```
 
 ```fsharp
-// examples/recursion/mutual.fsrs
+// examples/recursion/mutual.fsx
 
 // Mutually recursive even/odd
 let rec even n =

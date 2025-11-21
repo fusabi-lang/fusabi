@@ -6,20 +6,20 @@
 
 ## Overview
 
-This PR implements the complete Hindley-Milner type inference algorithm for FSRS, building on the type system foundation from Layer 1. The implementation provides a fully functional type checker with constraint-based inference, unification, and let-polymorphism.
+This PR implements the complete Hindley-Milner type inference algorithm for Fusabi, building on the type system foundation from Layer 1. The implementation provides a fully functional type checker with constraint-based inference, unification, and let-polymorphism.
 
 ## Implementation
 
 ### Files Added
 
-1. **`crates/fsrs-frontend/src/inference.rs`** (700+ lines)
+1. **`crates/fusabi-frontend/src/inference.rs`** (700+ lines)
    - Complete type inference engine
    - Robinson's unification algorithm with occurs check
    - Constraint generation and solving
    - Pattern type inference
    - Support for all F# expression types
 
-2. **`crates/fsrs-frontend/tests/test_inference.rs`** (1,200+ lines)
+2. **`crates/fusabi-frontend/tests/test_inference.rs`** (1,200+ lines)
    - 80 comprehensive tests covering:
      - Unification (20 tests)
      - Literals (5 tests)
@@ -31,7 +31,7 @@ This PR implements the complete Hindley-Milner type inference algorithm for FSRS
 
 ### Files Modified
 
-1. **`crates/fsrs-frontend/src/lib.rs`**
+1. **`crates/fusabi-frontend/src/lib.rs`**
    - Added `inference` module export
    - Updated documentation with type inference example
 
@@ -225,9 +225,9 @@ Clear error messages with context for debugging.
 ## Usage Example
 
 ```rust
-use fsrs_frontend::inference::TypeInference;
-use fsrs_frontend::types::TypeEnv;
-use fsrs_frontend::ast::{Expr, Literal, BinOp};
+use fusabi_frontend::inference::TypeInference;
+use fusabi_frontend::types::TypeEnv;
+use fusabi_frontend::ast::{Expr, Literal, BinOp};
 
 // Create inference engine and environment
 let mut infer = TypeInference::new();
@@ -282,7 +282,7 @@ The type inference engine integrates seamlessly with:
 
 ## Conclusion
 
-This implementation provides a robust, production-ready type inference system for FSRS with:
+This implementation provides a robust, production-ready type inference system for Fusabi with:
 - ✅ Complete Hindley-Milner algorithm
 - ✅ 91% test coverage (73/80 tests passing)
 - ✅ All core features working

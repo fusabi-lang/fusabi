@@ -1,4 +1,4 @@
-# FSRS Standard Library - Implementation Summary
+# Fusabi Standard Library - Implementation Summary
 
 **Date**: 2025-11-19
 **Phase**: Phase 3 Cycle 2 - Advanced Features
@@ -67,7 +67,7 @@
 ### ✅ Documentation
 
 1. **Example Scripts**
-   - `examples/stdlib_demo.fsrs` - Comprehensive usage examples
+   - `examples/stdlib_demo.fsx` - Comprehensive usage examples
    - Shows all 19 functions in action
    - Demonstrates real-world use cases
 
@@ -120,18 +120,18 @@ Running full VM test suite:
 ## File Locations
 
 ```
-/home/beengud/raibid-labs/fsrs/
-├── rust/crates/fsrs-vm/src/
+/home/beengud/fusabi-lang/fusabi/
+├── rust/crates/fusabi-vm/src/
 │   ├── lib.rs                 (updated - exports stdlib)
 │   └── stdlib/
 │       ├── mod.rs            (new - registry)
 │       ├── list.rs           (new - 7 functions)
 │       ├── string.rs         (new - 9 functions)
 │       └── option.rs         (new - 3 functions)
-├── rust/crates/fsrs-vm/tests/
+├── rust/crates/fusabi-vm/tests/
 │   └── test_stdlib.rs        (new - 20 integration tests)
 ├── examples/
-│   └── stdlib_demo.fsrs      (new - usage examples)
+│   └── stdlib_demo.fsx      (new - usage examples)
 └── docs/
     ├── stdlib-implementation.md  (new - complete docs)
     └── stdlib-summary.md         (this file)
@@ -179,4 +179,4 @@ This stdlib foundation enables future enhancements:
 **Lines of Code**: ~800 (including tests and docs)
 **Quality**: Production-ready
 
-The FSRS standard library is now complete and ready for use! 🎉
+The Fusabi standard library is now complete and ready for use! 🎉

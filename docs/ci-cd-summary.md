@@ -8,7 +8,7 @@
 
 ## Overview
 
-The complete CI/CD infrastructure for FSRS has been successfully set up and is ready for Phase 1 development. All components are tested and operational.
+The complete CI/CD infrastructure for Fusabi has been successfully set up and is ready for Phase 1 development. All components are tested and operational.
 
 ---
 
@@ -72,19 +72,19 @@ Comprehensive checks before push (~2-3 min):
 
 ```
 rust/crates/
-├── fsrs-frontend/
+├── fusabi-frontend/
 │   └── tests/test_placeholder.rs
 │       - Parser tests (TODO)
 │       - AST tests (TODO)
 │       - Lexer tests (TODO)
-├── fsrs-vm/
+├── fusabi-vm/
 │   ├── tests/test_placeholder.rs
 │   │   - VM execution tests (TODO)
 │   │   - Bytecode tests (TODO)
 │   │   - GC tests (TODO)
 │   └── benches/vm_benchmarks.rs
 │       - Performance benchmarks (TODO)
-└── fsrs-demo/
+└── fusabi-demo/
     └── tests/test_integration.rs
         - E2E tests (TODO)
         - Host interop tests (TODO)
@@ -173,8 +173,8 @@ just ci                 ✅ Passed (full CI simulation)
 # All test commands work
 just test               # 6 tests passed
 just test-unit          # 2 unit tests + 4 integration tests
-just test-vm            # fsrs-vm tests
-just test-frontend      # fsrs-frontend tests
+just test-vm            # fusabi-vm tests
+just test-frontend      # fusabi-frontend tests
 
 # Test summary:
 - Unit tests: 2 passed
@@ -231,10 +231,10 @@ All workflow files validated:
 
 #### Test Infrastructure (4 files)
 ```
-rust/crates/fsrs-frontend/tests/test_placeholder.rs
-rust/crates/fsrs-vm/tests/test_placeholder.rs
-rust/crates/fsrs-vm/benches/vm_benchmarks.rs
-rust/crates/fsrs-demo/tests/test_integration.rs
+rust/crates/fusabi-frontend/tests/test_placeholder.rs
+rust/crates/fusabi-vm/tests/test_placeholder.rs
+rust/crates/fusabi-vm/benches/vm_benchmarks.rs
+rust/crates/fusabi-demo/tests/test_integration.rs
 ```
 
 #### Configuration (3 files)
@@ -260,9 +260,9 @@ docs/ci-cd-summary.md
 
 #### Modified Files (5 files)
 ```
-rust/crates/fsrs-frontend/src/lib.rs  (added tests)
-rust/crates/fsrs-vm/src/lib.rs        (added tests)
-rust/crates/fsrs-vm/Cargo.toml        (added criterion dependency)
+rust/crates/fusabi-frontend/src/lib.rs  (added tests)
+rust/crates/fusabi-vm/src/lib.rs        (added tests)
+rust/crates/fusabi-vm/Cargo.toml        (added criterion dependency)
 scripts/test.nu                       (fixed nushell syntax)
 ```
 
@@ -554,7 +554,7 @@ just docs                  # Generate API docs
 
 ## Conclusion
 
-The FSRS CI/CD infrastructure is **complete, tested, and production-ready**. All components work together seamlessly:
+The Fusabi CI/CD infrastructure is **complete, tested, and production-ready**. All components work together seamlessly:
 
 - ✅ **Local Development**: Fast feedback with hooks and watch mode
 - ✅ **Continuous Integration**: Comprehensive multi-platform testing

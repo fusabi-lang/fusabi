@@ -1,19 +1,19 @@
 //! Beautiful Error Message Demonstration
 //!
 //! This example demonstrates the comprehensive error reporting infrastructure
-//! built for FSRS type checking with:
+//! built for Fusabi type checking with:
 //! - Source location tracking
 //! - Source code highlighting
 //! - Context tracking
 //! - Helpful suggestions
 
-use fsrs_frontend::error::{TypeError, TypeErrorKind};
-use fsrs_frontend::span::{Position, Span};
-use fsrs_frontend::types::{Type, TypeVar};
+use fusabi_frontend::error::{TypeError, TypeErrorKind};
+use fusabi_frontend::span::{Position, Span};
+use fusabi_frontend::types::{Type, TypeVar};
 use std::collections::HashMap;
 
 fn main() {
-    println!("=== FSRS Error Reporting Demo ===\n");
+    println!("=== Fusabi Error Reporting Demo ===\n");
 
     // Example 1: Type Mismatch with Source Highlighting
     println!("Example 1: Type Mismatch\n");

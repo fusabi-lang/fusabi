@@ -76,19 +76,19 @@ jobs:
 ### Integration Tests
 
 ```rust
-// rust/crates/fsrs-demo/tests/integration_test.rs
+// rust/crates/fusabi-demo/tests/integration_test.rs
 
-use fsrs_demo::run_script;
+use fusabi_demo::run_script;
 
 #[test]
 fn test_arithmetic_script() {
-    let result = run_script("../examples/arithmetic.fsrs").unwrap();
+    let result = run_script("../examples/arithmetic.fsx").unwrap();
     assert_eq!(result.as_int(), Some(7)); // 1 + 2 * 3
 }
 
 #[test]
 fn test_conditional_script() {
-    let result = run_script("../examples/conditional.fsrs").unwrap();
+    let result = run_script("../examples/conditional.fsx").unwrap();
     assert_eq!(result.as_int(), Some(42));
 }
 ```

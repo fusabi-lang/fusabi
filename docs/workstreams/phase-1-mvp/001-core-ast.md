@@ -29,12 +29,12 @@ None - This is a foundational issue
 ## Technical Specification
 
 ### File Location
-`rust/crates/fsrs-frontend/src/ast.rs`
+`rust/crates/fusabi-frontend/src/ast.rs`
 
 ### Core Types
 
 ```rust
-// rust/crates/fsrs-frontend/src/ast.rs
+// rust/crates/fusabi-frontend/src/ast.rs
 
 /// Literal values in the AST
 #[derive(Debug, Clone, PartialEq)]
@@ -113,7 +113,7 @@ pub struct Span {
 ### Step 1: Create ast.rs Module
 
 ```rust
-// rust/crates/fsrs-frontend/src/lib.rs
+// rust/crates/fusabi-frontend/src/lib.rs
 pub mod ast;
 
 // Optionally re-export for convenience
@@ -180,7 +180,7 @@ impl std::fmt::Display for BinOp {
 ### Unit Tests
 
 ```rust
-// rust/crates/fsrs-frontend/src/ast.rs
+// rust/crates/fusabi-frontend/src/ast.rs
 
 #[cfg(test)]
 mod tests {
@@ -260,7 +260,7 @@ mod tests {
 ///
 /// Creating a simple addition expression:
 /// ```
-/// use fsrs_frontend::ast::{Expr, BinOp, Literal};
+/// use fusabi_frontend::ast::{Expr, BinOp, Literal};
 ///
 /// let expr = Expr::BinOp {
 ///     op: BinOp::Add,
@@ -275,8 +275,8 @@ pub enum Expr {
 ```
 
 ### Files to Create/Update
-- [x] `rust/crates/fsrs-frontend/src/ast.rs` - Main AST definitions
-- [x] `rust/crates/fsrs-frontend/src/lib.rs` - Export ast module
+- [x] `rust/crates/fusabi-frontend/src/ast.rs` - Main AST definitions
+- [x] `rust/crates/fusabi-frontend/src/lib.rs` - Export ast module
 - [ ] `docs/architecture/ast-design.md` - AST design doc (optional)
 
 ## Estimated Effort

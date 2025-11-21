@@ -1,6 +1,6 @@
-# fsrs Overview
+# Fusabi Overview
 
-`fsrs` is a **Mini‑F# dialect + Rust VM** primarily intended for embedded scripting in a Rust host application, such as a terminal emulator.
+`fusabi` is a **Mini‑F# dialect + Rust VM** primarily intended for embedded scripting in a Rust host application, such as a terminal emulator.
 
 The language:
 
@@ -27,7 +27,7 @@ The target use case is to replace Lua in something like WezTerm:
 
 ## Architectural components
 
-1. **Front‑end (`fsrs-frontend` crate)**
+1. **Front‑end (`fusabi-frontend` crate)**
 
    - Tokenizer and parser for the Mini‑F# syntax subset.
    - Hindley‑Milner‑style type inference for:
@@ -40,7 +40,7 @@ The target use case is to replace Lua in something like WezTerm:
      - Pattern matching → simpler core decision trees.
    - Core AST suitable for compilation into bytecode.
 
-2. **VM / runtime (`fsrs-vm` crate)**
+2. **VM / runtime (`fusabi-vm` crate)**
 
    - `Value` enum representing runtime values.
    - `Instruction` enum and bytecode `Chunk` representation.
@@ -51,12 +51,12 @@ The target use case is to replace Lua in something like WezTerm:
    - Built‑in functions and host interop stubs:
      - You will later expose host APIs (terminal actions, logging, etc.).
 
-3. **Host demo (`fsrs-demo` crate)**
+3. **Host demo (`fusabi-demo` crate)**
 
    - Small binary that:
-     - Loads a `.fsrs` file from `examples/`.
-     - Uses `fsrs-frontend` to parse/compile it to bytecode.
-     - Executes the bytecode in `fsrs-vm`.
+     - Loads a `.fsx` file from `examples/`.
+     - Uses `fusabi-frontend` to parse/compile it to bytecode.
+     - Executes the bytecode in `fusabi-vm`.
    - Initialize host → script wiring:
      - Register a few built‑in functions (e.g. `print`, `add`).
      - Demonstrate calling script functions from Rust and vice versa.

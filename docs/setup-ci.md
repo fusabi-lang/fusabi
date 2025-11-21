@@ -1,6 +1,6 @@
-# CI/CD Setup Guide for FSRS
+# CI/CD Setup Guide for Fusabi
 
-This document provides step-by-step instructions for setting up the CI/CD infrastructure for FSRS.
+This document provides step-by-step instructions for setting up the CI/CD infrastructure for Fusabi.
 
 ## Table of Contents
 
@@ -15,7 +15,7 @@ This document provides step-by-step instructions for setting up the CI/CD infras
 
 ## Overview
 
-The FSRS CI/CD infrastructure includes:
+The Fusabi CI/CD infrastructure includes:
 
 1. **GitHub Actions Workflows**: Automated testing, building, and releasing
 2. **Pre-commit Hooks**: Local checks before commits and pushes
@@ -317,7 +317,7 @@ ls -la .github/workflows/
 
 ```bash
 # Make a small change
-echo "// test" >> rust/crates/fsrs-vm/src/lib.rs
+echo "// test" >> rust/crates/fusabi-vm/src/lib.rs
 
 # Try to commit (hooks will run)
 git add .
@@ -485,10 +485,10 @@ The CI is configured with `continue-on-error: true` for benchmark jobs.
 ### Test Infrastructure
 
 ```
-rust/crates/fsrs-frontend/tests/test_placeholder.rs - Frontend tests
-rust/crates/fsrs-vm/tests/test_placeholder.rs       - VM tests
-rust/crates/fsrs-vm/benches/vm_benchmarks.rs        - VM benchmarks
-rust/crates/fsrs-demo/tests/test_integration.rs     - E2E tests
+rust/crates/fusabi-frontend/tests/test_placeholder.rs - Frontend tests
+rust/crates/fusabi-vm/tests/test_placeholder.rs       - VM tests
+rust/crates/fusabi-vm/benches/vm_benchmarks.rs        - VM benchmarks
+rust/crates/fusabi-demo/tests/test_integration.rs     - E2E tests
 ```
 
 ### Documentation

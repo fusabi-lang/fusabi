@@ -1,6 +1,6 @@
 #!/usr/bin/env nu
 
-# FSRS Build Script
+# Fusabi Build Script
 # Orchestrates building the workspace with proper error handling
 
 def main [
@@ -8,7 +8,7 @@ def main [
     --crate: string = ""    # Specific crate to build (empty = all)
     --verbose: bool = false # Verbose output
 ] {
-    print $"🚀 Building FSRS ($mode mode)"
+    print $"🚀 Building Fusabi ($mode mode)"
 
     # Validate mode
     if $mode not-in ["dev", "release"] {
@@ -59,10 +59,10 @@ def main [
         # Show build artifacts
         if $mode == "release" {
             print "\n📦 Release binaries:"
-            ls target/release/fsrs-* | where type == "file" | select name size
+            ls target/release/fusabi* | where type == "file" | select name size
         } else {
             print "\n📦 Debug binaries:"
-            ls target/debug/fsrs-* | where type == "file" | select name size | first 5
+            ls target/debug/fusabi* | where type == "file" | select name size | first 5
         }
     } else {
         print "❌ Build failed!"

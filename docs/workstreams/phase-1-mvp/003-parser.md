@@ -32,7 +32,7 @@ Phase 1.1: Frontend Foundation (Week 1)
 ## Technical Specification
 
 ### File Location
-`rust/crates/fsrs-frontend/src/parser.rs`
+`rust/crates/fusabi-frontend/src/parser.rs`
 
 ### Core Parser Structure
 

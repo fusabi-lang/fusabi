@@ -1,6 +1,6 @@
-# FSRS Development Guide
+# Fusabi Development Guide
 
-Quick reference for FSRS development workflows, tools, and best practices.
+Quick reference for Fusabi development workflows, tools, and best practices.
 
 ## Table of Contents
 
@@ -21,7 +21,7 @@ Quick reference for FSRS development workflows, tools, and best practices.
 
 ```bash
 # Clone repository
-git clone https://github.com/raibid-labs/fsrs.git
+git clone https://github.com/fusabi-lang/fusabi.git
 cd fsrs
 
 # Bootstrap environment
@@ -63,7 +63,7 @@ just test
 just watch-test
 
 # 2. Make changes
-vim rust/crates/fsrs-vm/src/vm.rs
+vim rust/crates/fusabi-vm/src/vm.rs
 
 # 3. Tests run automatically
 # ... watch for failures ...
@@ -83,13 +83,13 @@ git push
 
 ```bash
 # 1. Write failing test
-vim rust/crates/fsrs-vm/tests/test_vm.rs
+vim rust/crates/fusabi-vm/tests/test_vm.rs
 
 # 2. Run test (should fail)
 just test-vm
 
 # 3. Implement feature
-vim rust/crates/fsrs-vm/src/vm.rs
+vim rust/crates/fusabi-vm/src/vm.rs
 
 # 4. Run test (should pass)
 just test-vm
@@ -266,7 +266,7 @@ mod tests {
 }
 
 // Integration tests (in tests/)
-use fsrs_vm::VM;
+use fusabi_vm::VM;
 
 #[test]
 fn test_end_to_end() {
@@ -311,10 +311,10 @@ log::error!("Failed: {}", err);
 just build
 
 # Debug with rust-gdb
-rust-gdb rust/target/debug/fsrs-demo
+rust-gdb rust/target/debug/fusabi-demo
 
 # Debug with rust-lldb (macOS)
-rust-lldb rust/target/debug/fsrs-demo
+rust-lldb rust/target/debug/fusabi-demo
 ```
 
 ### Print Debugging
@@ -336,9 +336,9 @@ Add to `.vscode/launch.json`:
     {
       "type": "lldb",
       "request": "launch",
-      "name": "Debug fsrs-demo",
+      "name": "Debug fusabi-demo",
       "cargo": {
-        "args": ["build", "-p", "fsrs-demo"]
+        "args": ["build", "-p", "fusabi-demo"]
       },
       "args": [],
       "cwd": "${workspaceFolder}/rust"
@@ -628,7 +628,7 @@ cd rust && cargo test test_name -- --nocapture
 - [Rust by Example](https://doc.rust-lang.org/rust-by-example/)
 - [Cargo Book](https://doc.rust-lang.org/cargo/)
 - [Clippy Lints](https://rust-lang.github.io/rust-clippy/master/)
-- [FSRS Documentation](docs/)
+- [Fusabi Documentation](docs/)
 
 ---
 
@@ -664,4 +664,4 @@ just ci                 # Full CI checks
 For more details, see:
 - [testing.md](testing.md) - Testing guide
 - [ci-cd.md](ci-cd.md) - CI/CD documentation
-- [CLAUDE.md](../CLAUDE.md) - Claude Code configuration
+- [claude-config.md](claude-config.md) - Claude Code configuration

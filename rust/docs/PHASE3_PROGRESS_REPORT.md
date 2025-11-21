@@ -20,7 +20,7 @@ Successfully completed **Cycle 1 of Phase 3** using parallel meta-orchestration.
 ## Agent 1: Parser Enhancements
 
 ### Mission
-Enhance FSRS parser to unlock 41 ignored integration tests by implementing missing syntax features.
+Enhance Fusabi parser to unlock 41 ignored integration tests by implementing missing syntax features.
 
 ### Deliverables
 
@@ -65,8 +65,8 @@ Contrary to expectations, these features **already worked**:
 - Record literals: `{ name = "John"; age = 30 }`
 
 ### Files Modified
-- `crates/fsrs-frontend/src/parser.rs` (+enhanced parse_lambda)
-- `crates/fsrs-demo/tests/records_integration.rs` (6 tests enabled)
+- `crates/fusabi-frontend/src/parser.rs` (+enhanced parse_lambda)
+- `crates/fusabi-demo/tests/records_integration.rs` (6 tests enabled)
 
 ---
 
@@ -78,7 +78,7 @@ Implement module system infrastructure to enable code organization and reusabili
 ### Deliverables
 
 #### 1. Module Registry System
-**New File**: `crates/fsrs-frontend/src/modules.rs` (218 lines)
+**New File**: `crates/fusabi-frontend/src/modules.rs` (218 lines)
 
 **Features**:
 - `ModuleRegistry`: Centralized module management
@@ -95,7 +95,7 @@ let expr = registry.resolve_qualified(&["Math"], "add")?;
 ```
 
 #### 2. AST Extensions
-**Modified**: `crates/fsrs-frontend/src/ast.rs` (+123 lines)
+**Modified**: `crates/fusabi-frontend/src/ast.rs` (+123 lines)
 
 **New Types**:
 ```rust
@@ -126,7 +126,7 @@ pub struct Import {
 **Complete Display trait implementations** for all new types.
 
 #### 3. Lexer Support
-**Modified**: `crates/fsrs-frontend/src/lexer.rs` (+6 lines)
+**Modified**: `crates/fusabi-frontend/src/lexer.rs` (+6 lines)
 
 Added tokens:
 - `Open` - for `open Math` imports
@@ -135,7 +135,7 @@ Added tokens:
 #### 4. Example Scripts
 Created 3 comprehensive examples:
 
-**`examples/modules_basic.fsrs`**:
+**`examples/modules_basic.fsx`**:
 ```fsharp
 module Math =
     let add x y = x + y
@@ -145,7 +145,7 @@ open Math
 let result = multiply (add 3 4) 2  // Result: 14
 ```
 
-**`examples/modules_nested.fsrs`**:
+**`examples/modules_nested.fsx`**:
 ```fsharp
 module Geometry =
     module Point =
@@ -154,7 +154,7 @@ module Geometry =
     let origin = Point.make 0 0
 ```
 
-**`examples/modules_math.fsrs`**:
+**`examples/modules_math.fsx`**:
 ```fsharp
 module Math =
     let rec factorial n =
@@ -173,16 +173,16 @@ module Math =
 - **Total Tests**: 0 failures, 0 regressions
 
 ### Files Created
-- `crates/fsrs-frontend/src/modules.rs`
-- `examples/modules_basic.fsrs`
-- `examples/modules_math.fsrs`
-- `examples/modules_nested.fsrs`
+- `crates/fusabi-frontend/src/modules.rs`
+- `examples/modules_basic.fsx`
+- `examples/modules_math.fsx`
+- `examples/modules_nested.fsx`
 - `docs/module_system.md`
 
 ### Files Modified
-- `crates/fsrs-frontend/src/ast.rs`
-- `crates/fsrs-frontend/src/lexer.rs`
-- `crates/fsrs-frontend/src/lib.rs`
+- `crates/fusabi-frontend/src/ast.rs`
+- `crates/fusabi-frontend/src/lexer.rs`
+- `crates/fusabi-frontend/src/lib.rs`
 
 ---
 

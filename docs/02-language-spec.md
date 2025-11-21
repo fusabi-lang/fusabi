@@ -1,6 +1,6 @@
 # Mini‑F# Dialect Specification (Draft)
 
-This document defines the initial Mini‑F# dialect that `fsrs` will support.
+This document defines the initial Mini‑F# dialect that `fusabi` will support.
 
 The language is intentionally small and expression‑oriented.
 
@@ -127,7 +127,7 @@ Tuples are displayed with comma separators: `(1, 2, 3)`
 
 ### 3.5 Lists
 
-Lists are homogeneous, immutable sequences. FSRS supports:
+Lists are homogeneous, immutable sequences. Fusabi supports:
 
 #### List literals
 
@@ -167,7 +167,7 @@ let nested = [1; 2] :: [3; 4] :: []  // [[1; 2]; [3; 4]]
 
 ### 3.6 Arrays
 
-Arrays are mutable, indexed collections with F# syntax. FSRS provides full array support with immutable update semantics.
+Arrays are mutable, indexed collections with F# syntax. Fusabi provides full array support with immutable update semantics.
 
 #### Array Literals
 
@@ -285,7 +285,7 @@ let elem = matrix.[1].[0]  // 3
 
 ### 3.7 Pattern matching
 
-Pattern matching destructures values and branches based on their shape. FSRS supports pattern matching over literals, variables, wildcards, and tuples.
+Pattern matching destructures values and branches based on their shape. Fusabi supports pattern matching over literals, variables, wildcards, and tuples.
 
 #### Basic Syntax
 

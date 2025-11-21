@@ -1,9 +1,9 @@
 #!/usr/bin/env nu
 
-# Setup Git Hooks for FSRS
+# Setup Git Hooks for Fusabi
 # This script installs pre-commit and pre-push hooks
 
-print "🔧 Setting up Git hooks for FSRS..."
+print "🔧 Setting up Git hooks for Fusabi..."
 
 # Check if we're in the right directory
 if not (".git" | path exists) {

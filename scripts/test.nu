@@ -1,6 +1,6 @@
 #!/usr/bin/env nu
 
-# FSRS Test Runner
+# Fusabi Test Runner
 # Runs tests with proper filtering and reporting
 
 def main [
@@ -9,7 +9,7 @@ def main [
     --verbose              # Show test output
     --nocapture            # Don't capture stdout
 ] {
-    print $"🧪 Running FSRS tests \(($mode) mode\)"
+    print $"🧪 Running Fusabi tests \(($mode) mode\)"
 
     # Check if cargo is available
     if (which cargo | is-empty) {

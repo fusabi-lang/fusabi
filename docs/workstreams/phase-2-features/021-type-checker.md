@@ -33,7 +33,7 @@ None (completes Phase 2)
 
 ### Compiler Integration
 ```rust
-// fsrs-frontend/src/compiler.rs
+// fusabi-frontend/src/compiler.rs
 
 impl Compiler {
     pub fn compile_with_types(expr: &Expr) -> Result<Chunk, CompileError> {
@@ -68,7 +68,7 @@ impl Compiler {
 
 ### Type Error Messages
 ```rust
-// fsrs-frontend/src/types.rs
+// fusabi-frontend/src/types.rs
 
 #[derive(Debug, Clone)]
 pub enum TypeError {

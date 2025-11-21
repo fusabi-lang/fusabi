@@ -1,10 +1,10 @@
 # Compiler Integration for Type Checking
 
-This document describes the compiler integration points for optional type checking in FSRS.
+This document describes the compiler integration points for optional type checking in Fusabi.
 
 ## Overview
 
-The FSRS compiler now supports optional type checking before code generation. This is implemented through a layered architecture that maintains backward compatibility while enabling gradual adoption of type checking features.
+The Fusabi compiler now supports optional type checking before code generation. This is implemented through a layered architecture that maintains backward compatibility while enabling gradual adoption of type checking features.
 
 ## Architecture
 
@@ -74,8 +74,8 @@ The type checking phase is currently a placeholder that will be replaced with th
 ### From Rust Code
 
 ```rust
-use fsrs_frontend::{Compiler, CompileOptions};
-use fsrs_frontend::ast::Expr;
+use fusabi_frontend::{Compiler, CompileOptions};
+use fusabi_frontend::ast::Expr;
 
 // Without type checking
 let chunk = Compiler::compile(&expr)?;
@@ -92,10 +92,10 @@ let options = CompileOptions {
 let chunk = Compiler::compile_with_options(&expr, options)?;
 ```
 
-### From fsrs-demo Library
+### From fusabi-demo Library
 
 ```rust
-use fsrs_demo::{run_source, run_source_checked, run_source_with_options, RunOptions};
+use fusabi_demo::{run_source, run_source_checked, run_source_with_options, RunOptions};
 
 // Without type checking (backward compatible)
 let result = run_source("let x = 42 in x + 1")?;
@@ -136,7 +136,7 @@ Type errors are propagated through the compilation pipeline and can be caught at
 The `typed_ast` module provides optional type-annotated AST nodes:
 
 ```rust
-use fsrs_frontend::typed_ast::{TypedExpr, TypedPattern, Span};
+use fusabi_frontend::typed_ast::{TypedExpr, TypedPattern, Span};
 
 // Create a typed expression
 let typed = TypedExpr::new(expr, ty);
@@ -261,7 +261,7 @@ Comprehensive integration tests are provided in `tests/test_type_checking.rs`:
 Run tests:
 
 ```bash
-cargo test --package fsrs-demo test_type_checking
+cargo test --package fusabi-demo test_type_checking
 ```
 
 ## Performance Considerations

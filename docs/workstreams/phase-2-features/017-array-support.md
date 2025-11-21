@@ -33,7 +33,7 @@ VM (Developer 2)
 
 ### AST Extension
 ```rust
-// fsrs-frontend/src/ast.rs
+// fusabi-frontend/src/ast.rs
 #[derive(Debug, Clone, PartialEq)]
 pub enum Expr {
     Array(Vec<Expr>),              // [|1; 2; 3|]
@@ -45,7 +45,7 @@ pub enum Expr {
 
 ### Value Extension
 ```rust
-// fsrs-vm/src/value.rs
+// fusabi-vm/src/value.rs
 use std::cell::RefCell;
 use std::rc::Rc;
 

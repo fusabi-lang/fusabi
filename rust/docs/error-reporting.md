@@ -1,6 +1,6 @@
 # Error Reporting Infrastructure
 
-Comprehensive error reporting system for FSRS type checking with beautiful formatting, source location tracking, and helpful suggestions.
+Comprehensive error reporting system for Fusabi type checking with beautiful formatting, source location tracking, and helpful suggestions.
 
 ## Features
 
@@ -9,7 +9,7 @@ Comprehensive error reporting system for FSRS type checking with beautiful forma
 The `span` module provides precise source location tracking:
 
 ```rust
-use fsrs_frontend::span::{Position, Span};
+use fusabi_frontend::span::{Position, Span};
 
 // Track positions in source code
 let start = Position::new(1, 5, 4);  // line, column, offset
@@ -94,8 +94,8 @@ Enhanced lexer with span support:
 ### Basic Error Creation
 
 ```rust
-use fsrs_frontend::error::{TypeError, TypeErrorKind};
-use fsrs_frontend::types::Type;
+use fusabi_frontend::error::{TypeError, TypeErrorKind};
+use fusabi_frontend::types::Type;
 
 let err = TypeError::new(TypeErrorKind::Mismatch {
     expected: Type::Int,
@@ -106,7 +106,7 @@ let err = TypeError::new(TypeErrorKind::Mismatch {
 ### Error with Source Location
 
 ```rust
-use fsrs_frontend::span::{Position, Span};
+use fusabi_frontend::span::{Position, Span};
 
 let span = Span::new(
     Position::new(1, 9, 8),

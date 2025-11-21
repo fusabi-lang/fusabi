@@ -1,10 +1,10 @@
-# Host Interop Demo - FSRS Host Function API
+# Host Interop Demo - Fusabi Host Function API
 
-This document demonstrates the host interop functionality for FSRS.
+This document demonstrates the host interop functionality for Fusabi.
 
 ## Overview
 
-The FSRS host interop API allows Rust applications to:
+The Fusabi host interop API allows Rust applications to:
 - Register native functions callable from FSRS scripts
 - Automatically marshal types between Rust and FSRS
 - Call host functions with type safety
@@ -13,8 +13,8 @@ The FSRS host interop API allows Rust applications to:
 ## Example Usage
 
 ```rust
-use fsrs_demo::FsrsEngine;
-use fsrs_vm::Value;
+use fusabi_demo::FsrsEngine;
+use fusabi_vm::Value;
 
 fn main() {
     let mut engine = FsrsEngine::new();
@@ -22,7 +22,7 @@ fn main() {
     // Example 1: Simple arithmetic
     engine.register_fn1("double", |v| {
         let n = v.as_int()
-            .ok_or_else(|| fsrs_vm::VmError::Runtime("Expected int".into()))?;
+            .ok_or_else(|| fusabi_vm::VmError::Runtime("Expected int".into()))?;
         Ok(Value::Int(n * 2))
     });
 
@@ -32,7 +32,7 @@ fn main() {
     // Example 2: String manipulation
     engine.register_fn1("greet", |v| {
         let name = v.as_str()
-            .ok_or_else(|| fsrs_vm::VmError::Runtime("Expected string".into()))?;
+            .ok_or_else(|| fusabi_vm::VmError::Runtime("Expected string".into()))?;
         Ok(Value::Str(format!("Hello, {}!", name)))
     });
 
@@ -44,7 +44,7 @@ fn main() {
     // Example 3: List processing
     engine.register_fn1("sum", |v| {
         let list = v.list_to_vec()
-            .ok_or_else(|| fsrs_vm::VmError::Runtime("Expected list".into()))?;
+            .ok_or_else(|| fusabi_vm::VmError::Runtime("Expected list".into()))?;
         let sum: i64 = list.iter().filter_map(|v| v.as_int()).sum();
         Ok(Value::Int(sum))
     });
@@ -76,10 +76,10 @@ All integration tests pass:
 
 ## Implementation Files
 
-- `/rust/crates/fsrs-vm/src/host.rs` - Host function registry
-- `/rust/crates/fsrs-vm/src/conversions.rs` - Type conversions
-- `/rust/crates/fsrs-demo/src/host_api.rs` - High-level API
-- `/rust/crates/fsrs-vm/tests/test_host_interop.rs` - Integration tests
+- `/rust/crates/fusabi-vm/src/host.rs` - Host function registry
+- `/rust/crates/fusabi-vm/src/conversions.rs` - Type conversions
+- `/rust/crates/fusabi-demo/src/host_api.rs` - High-level API
+- `/rust/crates/fusabi-vm/tests/test_host_interop.rs` - Integration tests
 
 ## API Reference
 

@@ -33,7 +33,7 @@ VM (Developer 2)
 
 ### Bytecode Instructions
 ```rust
-// fsrs-vm/src/bytecode.rs
+// fusabi-vm/src/bytecode.rs
 
 pub enum Instruction {
     // Pattern matching
@@ -49,7 +49,7 @@ pub enum Instruction {
 
 ### Decision Tree Compilation
 ```rust
-// fsrs-frontend/src/compiler.rs
+// fusabi-frontend/src/compiler.rs
 
 impl Compiler {
     fn compile_match(

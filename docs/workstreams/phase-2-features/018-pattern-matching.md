@@ -36,7 +36,7 @@ Frontend (Developer 1)
 
 ### AST Extension
 ```rust
-// fsrs-frontend/src/ast.rs
+// fusabi-frontend/src/ast.rs
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Expr {
@@ -84,7 +84,7 @@ pub enum Pattern {
 
 ### Parser
 ```rust
-// fsrs-frontend/src/parser.rs
+// fusabi-frontend/src/parser.rs
 
 impl Parser {
     fn parse_match(&mut self) -> Result<Expr, ParseError> {

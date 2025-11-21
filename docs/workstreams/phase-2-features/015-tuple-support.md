@@ -32,7 +32,7 @@ Frontend (Developer 1)
 
 ### AST Extension
 ```rust
-// fsrs-frontend/src/ast.rs
+// fusabi-frontend/src/ast.rs
 #[derive(Debug, Clone, PartialEq)]
 pub enum Expr {
     /// Tuple construction: (expr1, expr2, ...)
@@ -49,7 +49,7 @@ pub enum Pattern {
 
 ### Value Extension
 ```rust
-// fsrs-vm/src/value.rs
+// fusabi-vm/src/value.rs
 #[derive(Debug, Clone)]
 pub enum Value {
     Tuple(Vec<Value>),
@@ -59,7 +59,7 @@ pub enum Value {
 
 ### Bytecode
 ```rust
-// fsrs-vm/src/bytecode.rs
+// fusabi-vm/src/bytecode.rs
 pub enum Instruction {
     MakeTuple(u8),  // Create tuple with N elements
     GetTupleElement(u8),  // Get element at index

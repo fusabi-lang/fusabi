@@ -1,4 +1,4 @@
-# FSRS - F# Script Engine
+# Fusabi - F# Script Engine
 # Build automation for Mini-F# bytecode VM and runtime
 
 # Default recipe - show available commands
@@ -23,15 +23,15 @@ build-crate CRATE:
 
 # Build frontend compiler
 build-frontend:
-    cd rust && cargo build -p fsrs-frontend
+    cd rust && cargo build -p fusabi-frontend
 
 # Build VM runtime
 build-vm:
-    cd rust && cargo build -p fsrs-vm
+    cd rust && cargo build -p fusabi-vm
 
 # Build demo host
 build-demo:
-    cd rust && cargo build -p fsrs-demo
+    cd rust && cargo build -p fusabi
 
 # Clean build artifacts
 clean:
@@ -64,11 +64,11 @@ test-unit:
 
 # Run VM tests
 test-vm:
-    cd rust && cargo test -p fsrs-vm
+    cd rust && cargo test -p fusabi-vm
 
 # Run frontend tests
 test-frontend:
-    cd rust && cargo test -p fsrs-frontend
+    cd rust && cargo test -p fusabi-frontend
 
 # ============================================================================
 # Development
@@ -76,11 +76,11 @@ test-frontend:
 
 # Run demo host with example script
 demo:
-    cd rust && cargo run -p fsrs-demo
+    cd rust && cargo run -p fusabi
 
 # Run demo with specific example
 demo-example EXAMPLE:
-    cd rust && cargo run -p fsrs-demo -- ../examples/{{EXAMPLE}}.fsrs
+    cd rust && cargo run -p fusabi -- ../examples/{{EXAMPLE}}.fsx
 
 # Run in development mode with watch
 watch:
@@ -92,11 +92,11 @@ watch-test:
 
 # Watch and run demo
 watch-demo:
-    cd rust && cargo watch -x 'run -p fsrs-demo'
+    cd rust && cargo watch -x 'run -p fusabi'
 
 # Start development environment (watch + test)
 dev:
-    cd rust && cargo watch -x 'test --workspace' -x 'run -p fsrs-demo'
+    cd rust && cargo watch -x 'test --workspace' -x 'run -p fusabi'
 
 # ============================================================================
 # Code Quality
@@ -146,11 +146,11 @@ compile SCRIPT OUTPUT:
 # List available example scripts
 examples:
     @echo "=== Available Examples ==="
-    @ls -1 examples/*.fsrs 2>/dev/null || echo "No examples yet"
+    @ls -1 examples/*.fsx 2>/dev/null || echo "No examples yet"
 
 # Run specific example with verbose output
 run-example EXAMPLE:
-    cd rust && cargo run -p fsrs-demo -- ../examples/{{EXAMPLE}}.fsrs --verbose
+    cd rust && cargo run -p fusabi -- ../examples/{{EXAMPLE}}.fsx --verbose
 
 # ============================================================================
 # Documentation
@@ -210,13 +210,13 @@ update:
 
 # Display workspace metadata
 info:
-    @echo "=== FSRS Project Info ==="
+    @echo "=== Fusabi Project Info ==="
     @echo "Project: F# Script Engine (Mini-F#)"
     @echo "Workspace: rust/"
     @echo "Crates:"
-    @echo "  - fsrs-frontend: Parser, typechecker, bytecode compiler"
-    @echo "  - fsrs-vm: Bytecode VM runtime"
-    @echo "  - fsrs-demo: Demo host application"
+    @echo "  - fusabi-frontend: Parser, typechecker, bytecode compiler"
+    @echo "  - fusabi-vm: Bytecode VM runtime"
+    @echo "  - fusabi: Demo host application"
     @cd rust && cargo metadata --no-deps --format-version 1 | jq -r '.workspace_members[]'
 
 # Count lines of code in the project
@@ -240,7 +240,7 @@ bench:
 
 # Run VM performance benchmarks
 bench-vm:
-    cd rust && cargo bench -p fsrs-vm
+    cd rust && cargo bench -p fusabi-vm
 
 # Profile demo execution
 profile:
@@ -286,7 +286,7 @@ asan:
 
 # Generate flame graph for performance analysis
 flamegraph:
-    cd rust && cargo flamegraph --bin fsrs-demo
+    cd rust && cargo flamegraph --bin fus
 
 # ============================================================================
 # Help
@@ -298,7 +298,7 @@ help COMMAND:
 
 # Show version information
 version:
-    @echo "FSRS Version: 0.1.0-alpha"
+    @echo "Fusabi Version: 0.1.0-alpha"
     @echo ""
     @cargo --version
     @rustc --version

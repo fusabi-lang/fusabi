@@ -6,8 +6,8 @@
 // - Type conversions between Rust and FSRS
 // - Working with lists, strings, and other types
 
-use fsrs_demo::FsrsEngine;
-use fsrs_vm::Value;
+use fusabi_demo::FsrsEngine;
+use fusabi_vm::Value;
 
 fn main() {
     println!("=== FSRS Host Interop Demo ===\n");
@@ -20,7 +20,7 @@ fn main() {
     engine.register_fn1("double", |v| {
         let n = v
             .as_int()
-            .ok_or_else(|| fsrs_vm::VmError::Runtime("Expected int".into()))?;
+            .ok_or_else(|| fusabi_vm::VmError::Runtime("Expected int".into()))?;
         Ok(Value::Int(n * 2))
     });
 
@@ -33,7 +33,7 @@ fn main() {
     engine.register_fn1("greet", |v| {
         let name = v
             .as_str()
-            .ok_or_else(|| fsrs_vm::VmError::Runtime("Expected string".into()))?;
+            .ok_or_else(|| fusabi_vm::VmError::Runtime("Expected string".into()))?;
         Ok(Value::Str(format!("Hello, {}!", name)))
     });
 
@@ -48,10 +48,10 @@ fn main() {
     engine.register_fn2("max", |a, b| {
         let x = a
             .as_int()
-            .ok_or_else(|| fsrs_vm::VmError::Runtime("Expected int".into()))?;
+            .ok_or_else(|| fusabi_vm::VmError::Runtime("Expected int".into()))?;
         let y = b
             .as_int()
-            .ok_or_else(|| fsrs_vm::VmError::Runtime("Expected int".into()))?;
+            .ok_or_else(|| fusabi_vm::VmError::Runtime("Expected int".into()))?;
         Ok(Value::Int(x.max(y)))
     });
 
@@ -66,7 +66,7 @@ fn main() {
     engine.register_fn1("sum", |v| {
         let list = v
             .list_to_vec()
-            .ok_or_else(|| fsrs_vm::VmError::Runtime("Expected list".into()))?;
+            .ok_or_else(|| fusabi_vm::VmError::Runtime("Expected list".into()))?;
         let sum: i64 = list.iter().filter_map(|v| v.as_int()).sum();
         Ok(Value::Int(sum))
     });
@@ -81,9 +81,9 @@ fn main() {
     engine.register_fn1("range", |v| {
         let n = v
             .as_int()
-            .ok_or_else(|| fsrs_vm::VmError::Runtime("Expected int".into()))?;
+            .ok_or_else(|| fusabi_vm::VmError::Runtime("Expected int".into()))?;
         if n < 0 {
-            return Err(fsrs_vm::VmError::Runtime(
+            return Err(fusabi_vm::VmError::Runtime(
                 "Range must be non-negative".into(),
             ));
         }
@@ -115,7 +115,7 @@ fn main() {
     engine.register_fn1("is_even", |v| {
         let n = v
             .as_int()
-            .ok_or_else(|| fsrs_vm::VmError::Runtime("Expected int".into()))?;
+            .ok_or_else(|| fusabi_vm::VmError::Runtime("Expected int".into()))?;
         Ok(Value::Bool(n % 2 == 0))
     });
 
@@ -130,13 +130,13 @@ fn main() {
     engine.register_fn3("clamp", |min_v, val_v, max_v| {
         let min = min_v
             .as_int()
-            .ok_or_else(|| fsrs_vm::VmError::Runtime("Expected int".into()))?;
+            .ok_or_else(|| fusabi_vm::VmError::Runtime("Expected int".into()))?;
         let val = val_v
             .as_int()
-            .ok_or_else(|| fsrs_vm::VmError::Runtime("Expected int".into()))?;
+            .ok_or_else(|| fusabi_vm::VmError::Runtime("Expected int".into()))?;
         let max = max_v
             .as_int()
-            .ok_or_else(|| fsrs_vm::VmError::Runtime("Expected int".into()))?;
+            .ok_or_else(|| fusabi_vm::VmError::Runtime("Expected int".into()))?;
         Ok(Value::Int(val.clamp(min, max)))
     });
 
@@ -155,7 +155,7 @@ fn main() {
     engine.register_fn1("concat_strings", |v| {
         let list = v
             .list_to_vec()
-            .ok_or_else(|| fsrs_vm::VmError::Runtime("Expected list".into()))?;
+            .ok_or_else(|| fusabi_vm::VmError::Runtime("Expected list".into()))?;
         let strings: Vec<String> = list
             .iter()
             .filter_map(|v| v.as_str().map(|s| s.to_string()))

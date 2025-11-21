@@ -1,6 +1,6 @@
 # bootstrap.nu
 #
-# Nushell script to (re)create the Rust workspace skeleton for fsrs.
+# Nushell script to (re)create the Rust workspace skeleton for Fusabi.
 #
 # Usage (from repo root):
 #
@@ -26,9 +26,9 @@ export def bootstrap [] {
   if not ($ws_toml | path exists) {
     $"[workspace]
 members = [
-  \"crates/fsrs-frontend\",
-  \"crates/fsrs-vm\",
-  \"crates/fsrs-demo\",
+  \"crates/fusabi-frontend\",
+  \"crates/fusabi-vm\",
+  \"crates/fusabi\",
 ]
 resolver = \"2\"
 " | save $ws_toml
@@ -67,8 +67,8 @@ version = \"0.1.0\"
 edition = \"2021\"
 
 [dependencies]
-fsrs-frontend = { path = \"../fsrs-frontend\" }
-fsrs-vm = { path = \"../fsrs-vm\" }
+fusabi-frontend = { path = \"../fusabi-frontend\" }
+fusabi-vm = { path = \"../fusabi-vm\" }
 " | save $cargo_file
       }
     }
@@ -81,8 +81,8 @@ fsrs-vm = { path = \"../fsrs-vm\" }
     if $kind == "lib" {
       let lib_file = ($src_dir | path join "lib.rs")
       if not ($lib_file | path exists) {
-        $"// (fsrs) crate: ($name)
-// This is a stub file. See docs/CLAUDE_CODE_NOTES.md for implementation steps.
+        $"// Fusabi crate: ($name)
+// This is a stub file. See docs/claude-code-notes.md for implementation steps.
 
 pub fn placeholder() {
     println!(\"($name) placeholder\");
@@ -92,22 +92,22 @@ pub fn placeholder() {
     } else if $kind == "bin" {
       let main_file = ($src_dir | path join "main.rs")
       if not ($main_file | path exists) {
-        $"// fsrs-demo: demo host for the Mini-F# VM
+        $"// fusabi: demo host for the Mini-F# VM
 // For now, this just prints a stub message and exits.
 
 fn main() {
-    println!(\"fsrs-demo stub. See docs/CLAUDE_CODE_NOTES.md for next steps.\");
+    println!(\"fusabi stub. See docs/claude-code-notes.md for next steps.\");
 }
 " | save $main_file
       }
     }
   }
 
-  ensure_crate "fsrs-frontend" "lib"
-  ensure_crate "fsrs-vm" "lib"
-  ensure_crate "fsrs-demo" "bin"
+  ensure_crate "fusabi-frontend" "lib"
+  ensure_crate "fusabi-vm" "lib"
+  ensure_crate "fusabi" "bin"
 
   cd $root
 
-  print \"fsrs Rust workspace bootstrapped (or already present) under ./rust\"
+  print "Fusabi Rust workspace bootstrapped (or already present) under ./rust"
 }

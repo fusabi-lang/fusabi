@@ -1,10 +1,10 @@
 # Compiler Integration for Module System
 
-This document describes the compiler integration for the FSRS module system, enabling module-aware bytecode generation.
+This document describes the compiler integration for the Fusabi module system, enabling module-aware bytecode generation.
 
 ## Overview
 
-The module-aware compiler extends the base FSRS compiler to support programs with module definitions, imports, and qualified names. This allows for better code organization and namespace management.
+The module-aware compiler extends the base Fusabi compiler to support programs with module definitions, imports, and qualified names. This allows for better code organization and namespace management.
 
 ## Features
 
@@ -100,8 +100,8 @@ When compiling a variable reference, the compiler checks in order:
 ### Direct Compilation
 
 ```rust
-use fsrs_frontend::compiler::Compiler;
-use fsrs_frontend::ast::Program;
+use fusabi_frontend::compiler::Compiler;
+use fusabi_frontend::ast::Program;
 
 let program = Program {
     modules: vec![/* ... */],
@@ -115,7 +115,7 @@ let chunk = Compiler::compile_program(&program)?;
 ### High-Level API
 
 ```rust
-use fsrs_frontend::compile_program_from_source;
+use fusabi_frontend::compile_program_from_source;
 
 let source = "42";
 let chunk = compile_program_from_source(source)?;
@@ -206,7 +206,7 @@ The module compiler integration is tested through comprehensive integration test
 
 Run tests with:
 ```bash
-cargo test --package fsrs-frontend --test compiler_modules
+cargo test --package fusabi-frontend --test compiler_modules
 ```
 
 ## Error Handling
@@ -261,4 +261,4 @@ The module compiler is fully backward compatible:
 
 ## Conclusion
 
-The compiler integration for the module system provides a solid foundation for organizing FSRS code. While Phase 1 has some limitations (primarily around lambda compilation), the core module infrastructure is in place and ready for future enhancements.
+The compiler integration for the module system provides a solid foundation for organizing Fusabi code. While Phase 1 has some limitations (primarily around lambda compilation), the core module infrastructure is in place and ready for future enhancements.

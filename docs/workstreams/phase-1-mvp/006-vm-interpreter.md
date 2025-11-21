@@ -23,7 +23,7 @@ Phase 1.2: VM Foundation (Week 2)
 ## Technical Specification
 
 ```rust
-// rust/crates/fsrs-vm/src/vm.rs
+// rust/crates/fusabi-vm/src/vm.rs
 
 use crate::value::Value;
 use crate::bytecode::{Chunk, Instruction};

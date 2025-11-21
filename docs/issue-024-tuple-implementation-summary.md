@@ -6,18 +6,18 @@
 ## Problem
 Issue #24 requests complete tuple support from scratch. The implementation requires systematic changes across 7+ files in multiple crates:
 
-1. **AST** (`fsrs-frontend/src/ast.rs`) - Add `Expr::Tuple(Vec<Expr>)`
-2. **Lexer** (`fsrs-frontend/src/lexer.rs`) - Add `Token::Comma`
-3. **Parser** (`fsrs-frontend/src/parser.rs`) - Parse `(e1, e2, ...)` as tuples
-4. **Value** (`fsrs-vm/src/value.rs`) - Add `Value::Tuple(Vec<Value>)`
-5. **Instructions** (`fsrs-vm/src/instruction.rs`) - Add `MakeTuple(u8)`, `GetTupleField(u8)`
+1. **AST** (`fusabi-frontend/src/ast.rs`) - Add `Expr::Tuple(Vec<Expr>)`
+2. **Lexer** (`fusabi-frontend/src/lexer.rs`) - Add `Token::Comma`
+3. **Parser** (`fusabi-frontend/src/parser.rs`) - Parse `(e1, e2, ...)` as tuples
+4. **Value** (`fusabi-vm/src/value.rs`) - Add `Value::Tuple(Vec<Value>)`
+5. **Instructions** (`fusabi-vm/src/instruction.rs`) - Add `MakeTuple(u8)`, `GetTupleField(u8)`
 6. **Compiler** (`fsrs-compiler/src/compiler.rs`) - Compile tuple expressions
-7. **VM** (`fsrs-vm/src/vm.rs`) - Execute tuple instructions
+7. **VM** (`fusabi-vm/src/vm.rs`) - Execute tuple instructions
 8. **Tests** (`tests/tuple_tests.rs`) - 20+ comprehensive tests
 
 ## Challenges Encountered
 1. **File Locking**: The codebase uses auto-formatting that modifies files between reads/writes
-2. **Cross-Crate Dependencies**: Changes require coordinated updates across fsrs-frontend, fsrs-vm, and fsrs-compiler
+2. **Cross-Crate Dependencies**: Changes require coordinated updates across fusabi-frontend, fusabi-vm, and fsrs-compiler
 3. **Existing Features**: Need to ensure compatibility with existing List/Cons features (found on different branch)
 
 ## Recommended Approach
@@ -27,7 +27,7 @@ Given the file locking issues and cross-crate dependencies, the user should:
 
 1. **Create feature branch**: `git checkout -b feat/issue-024-tuples-complete`
 
-2. **Add Tuple to AST** (`rust/crates/fsrs-frontend/src/ast.rs`):
+2. **Add Tuple to AST** (`rust/crates/fusabi-frontend/src/ast.rs`):
 ```rust
 pub enum Expr {
     // ... existing variants ...
@@ -37,7 +37,7 @@ pub enum Expr {
 }
 ```
 
-3. **Add Comma token** (`rust/crates/fsrs-frontend/src/lexer.rs`):
+3. **Add Comma token** (`rust/crates/fusabi-frontend/src/lexer.rs`):
 ```rust
 pub enum Token {
     // ... existing variants ...
@@ -53,7 +53,7 @@ pub enum Token {
 }
 ```
 
-4. **Add tuple parsing** (`rust/crates/fsrs-frontend/src/parser.rs`):
+4. **Add tuple parsing** (`rust/crates/fusabi-frontend/src/parser.rs`):
 ```rust
 // In parse_primary, modify LParen handling:
 Token::LParen => {
@@ -85,7 +85,7 @@ Token::LParen => {
 }
 ```
 
-5. **Add Tuple value** (`rust/crates/fsrs-vm/src/value.rs`):
+5. **Add Tuple value** (`rust/crates/fusabi-vm/src/value.rs`):
 ```rust
 pub enum Value {
     // ... existing variants ...
@@ -104,7 +104,7 @@ impl Value {
 }
 ```
 
-6. **Add tuple instructions** (`rust/crates/fsrs-vm/src/instruction.rs`):
+6. **Add tuple instructions** (`rust/crates/fusabi-vm/src/instruction.rs`):
 ```rust
 pub enum Instruction {
     // ... existing variants ...
@@ -135,7 +135,7 @@ fn compile_expr(&mut self, expr: &Expr) -> CompileResult<()> {
 }
 ```
 
-8. **Add VM execution** (`rust/crates/fsrs-vm/src/vm.rs`):
+8. **Add VM execution** (`rust/crates/fusabi-vm/src/vm.rs`):
 ```rust
 // In execute loop:
 Instruction::MakeTuple(count) => {
@@ -163,7 +163,7 @@ Instruction::GetTupleField(index) => {
 }
 ```
 
-9. **Create comprehensive tests** (`rust/crates/fsrs-frontend/tests/tuple_tests.rs`):
+9. **Create comprehensive tests** (`rust/crates/fusabi-frontend/tests/tuple_tests.rs`):
 ```rust
 #[test]
 fn test_tuple_pair() {

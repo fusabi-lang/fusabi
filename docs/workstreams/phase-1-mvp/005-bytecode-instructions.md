@@ -1,7 +1,7 @@
 # Issue #005: Bytecode Instructions and Chunks
 
 ## Overview
-Define the bytecode instruction set and chunk representation for the FSRS VM.
+Define the bytecode instruction set and chunk representation for the Fusabi VM.
 
 ## Labels
 - `feature`, `phase-1: mvp`, `priority: high`, `foundational`, `parallel-safe`, `component: vm`, `effort: s` (1-2 days)
@@ -22,7 +22,7 @@ None - Can work in parallel
 ## Technical Specification
 
 ```rust
-// rust/crates/fsrs-vm/src/bytecode.rs
+// rust/crates/fusabi-vm/src/bytecode.rs
 
 use crate::value::Value;
 

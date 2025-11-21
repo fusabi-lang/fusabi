@@ -1,6 +1,6 @@
-# FSRS CI/CD Documentation
+# Fusabi CI/CD Documentation
 
-This document describes the continuous integration and deployment infrastructure for FSRS.
+This document describes the continuous integration and deployment infrastructure for Fusabi.
 
 ## Table of Contents
 
@@ -169,9 +169,9 @@ Each platform:
 ##### Publish to crates.io (Optional)
 Automatically publish crates:
 ```yaml
-- Publish fsrs-vm
+- Publish fusabi-vm
 - Wait 30s
-- Publish fsrs-frontend
+- Publish fusabi-frontend
 ```
 
 **Note**: Requires `CARGO_TOKEN` secret configured.
@@ -248,9 +248,9 @@ git push --no-verify
 1. **Update Version Numbers**:
    ```bash
    # Update Cargo.toml in all crates
-   vim rust/crates/fsrs-vm/Cargo.toml
-   vim rust/crates/fsrs-frontend/Cargo.toml
-   vim rust/crates/fsrs-demo/Cargo.toml
+   vim rust/crates/fusabi-vm/Cargo.toml
+   vim rust/crates/fusabi-frontend/Cargo.toml
+   vim rust/crates/fusabi-demo/Cargo.toml
    ```
 
 2. **Update Changelog**:
@@ -277,10 +277,10 @@ git push --no-verify
 
 6. **Publish to crates.io** (if desired):
    ```bash
-   cd rust/crates/fsrs-vm
+   cd rust/crates/fusabi-vm
    cargo publish
 
-   cd ../fsrs-frontend
+   cd ../fusabi-frontend
    cargo publish
    ```
 
@@ -446,10 +446,10 @@ None required for basic CI.
 
 - **Badge**: Add to README.md:
   ```markdown
-  ![CI](https://github.com/raibid-labs/fsrs/workflows/CI/badge.svg)
+  ![CI](https://github.com/fusabi-lang/fusabi/workflows/CI/badge.svg)
   ```
 
-- **Dashboard**: https://github.com/raibid-labs/fsrs/actions
+- **Dashboard**: https://github.com/fusabi-lang/fusabi/actions
 
 ### Failure Notifications
 
@@ -467,7 +467,7 @@ Options:
 
 View coverage trends at:
 ```
-https://codecov.io/gh/raibid-labs/fsrs
+https://codecov.io/gh/fusabi-lang/fusabi
 ```
 
 ---

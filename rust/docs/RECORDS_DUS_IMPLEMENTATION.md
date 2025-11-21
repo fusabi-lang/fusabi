@@ -6,7 +6,7 @@
 
 ## Overview
 
-This document chronicles the full-stack implementation of **Records** and **Discriminated Unions (DUs)** in the FSRS (F# Script Runtime System) project. Both features are now fully implemented across all architectural layers.
+This document chronicles the full-stack implementation of **Records** and **Discriminated Unions (DUs)** in the Fusabi (Functional Scripting for Rust) project. Both features are now fully implemented across all architectural layers.
 
 ## Features Implemented
 
@@ -79,22 +79,22 @@ match Some 42 with
 
 Four comprehensive example scripts demonstrate practical usage:
 
-1. **dus_basic.fsrs** (1.7KB)
+1. **dus_basic.fsx** (1.7KB)
    - Simple DU type definitions
    - Basic pattern matching
    - Option/Result patterns
 
-2. **dus_patterns.fsrs** (4.6KB)
+2. **dus_patterns.fsx** (4.6KB)
    - Complex pattern matching
    - Nested variants
    - Guard patterns
 
-3. **e2e_user_system.fsrs** (6.6KB)
+3. **e2e_user_system.fsx** (6.6KB)
    - Complete user management system
    - Records + DUs working together
    - Practical real-world scenario
 
-4. **e2e_result_handling.fsrs** (11KB)
+4. **e2e_result_handling.fsx** (11KB)
    - Error handling patterns
    - Result<T, E> implementation
    - Railway-oriented programming
@@ -138,21 +138,21 @@ Variant {
 ## Files Modified/Created
 
 ### Core Implementation
-- `crates/fsrs-vm/src/value.rs` - Records + Variants value types
-- `crates/fsrs-vm/src/instruction.rs` - 6 new instructions
-- `crates/fsrs-vm/src/vm.rs` - 6 instruction handlers
-- `crates/fsrs-frontend/src/compiler.rs` - Record + Variant compilation
+- `crates/fusabi-vm/src/value.rs` - Records + Variants value types
+- `crates/fusabi-vm/src/instruction.rs` - 6 new instructions
+- `crates/fusabi-vm/src/vm.rs` - 6 instruction handlers
+- `crates/fusabi-frontend/src/compiler.rs` - Record + Variant compilation
 
 ### Tests
-- `crates/fsrs-demo/tests/records_integration.rs` - 47 record tests
-- `crates/fsrs-demo/tests/mixed_integration.rs` - 35 mixed tests
-- `crates/fsrs-frontend/tests/dus_integration.rs` - 17 DU tests
+- `crates/fusabi-demo/tests/records_integration.rs` - 47 record tests
+- `crates/fusabi-demo/tests/mixed_integration.rs` - 35 mixed tests
+- `crates/fusabi-frontend/tests/dus_integration.rs` - 17 DU tests
 
 ### Examples
-- `examples/dus_basic.fsrs`
-- `examples/dus_patterns.fsrs`
-- `examples/e2e_user_system.fsrs`
-- `examples/e2e_result_handling.fsrs`
+- `examples/dus_basic.fsx`
+- `examples/dus_patterns.fsx`
+- `examples/e2e_user_system.fsx`
+- `examples/e2e_result_handling.fsx`
 
 ## Merge History
 
@@ -269,7 +269,7 @@ Records and Discriminated Unions are **fully implemented and production-ready** 
 - ✅ Nested and mixed usage scenarios
 - ✅ Pattern matching support
 
-The FSRS language now supports two of F#'s most powerful features, enabling functional programming patterns like algebraic data types, immutable data structures, and sophisticated pattern matching.
+The Fusabi language now supports two of F#'s most powerful features, enabling functional programming patterns like algebraic data types, immutable data structures, and sophisticated pattern matching.
 
 ---
 

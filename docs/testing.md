@@ -1,6 +1,6 @@
-# FSRS Testing Guide
+# Fusabi Testing Guide
 
-This document describes the testing infrastructure, strategy, and best practices for the FSRS project.
+This document describes the testing infrastructure, strategy, and best practices for the Fusabi project.
 
 ## Table of Contents
 
@@ -42,20 +42,20 @@ FSRS uses a comprehensive testing strategy to ensure code quality:
 ```
 rust/
 ├── crates/
-│   ├── fsrs-frontend/
+│   ├── fusabi-frontend/
 │   │   ├── src/
 │   │   │   └── lib.rs          # Unit tests via #[cfg(test)]
 │   │   ├── tests/
 │   │   │   └── test_*.rs       # Integration tests
 │   │   └── benches/            # Benchmarks (future)
-│   ├── fsrs-vm/
+│   ├── fusabi-vm/
 │   │   ├── src/
 │   │   │   └── lib.rs          # Unit tests
 │   │   ├── tests/
 │   │   │   └── test_*.rs       # Integration tests
 │   │   └── benches/
 │   │       └── vm_benchmarks.rs # VM performance benchmarks
-│   └── fsrs-demo/
+│   └── fusabi-demo/
 │       ├── src/
 │       │   └── main.rs         # Minimal unit tests
 │       └── tests/
@@ -84,7 +84,7 @@ mod tests {
 
 ```rust
 // tests/test_parser.rs
-use fsrs_frontend::parser::Parser;
+use fusabi_frontend::parser::Parser;
 
 #[test]
 fn test_parse_let_binding() {
@@ -129,9 +129,9 @@ just test-unit
 just test-integration
 
 # Run tests for specific crate
-just test-crate fsrs-vm
-just test-vm        # Shorthand for fsrs-vm
-just test-frontend  # Shorthand for fsrs-frontend
+just test-crate fusabi-vm
+just test-vm        # Shorthand for fusabi-vm
+just test-frontend  # Shorthand for fusabi-frontend
 
 # Run tests with output
 nu scripts/test.nu --verbose
@@ -153,7 +153,7 @@ cd rust && cargo test --workspace --lib
 cd rust && cargo test --workspace --test '*'
 
 # Specific crate
-cd rust && cargo test -p fsrs-vm
+cd rust && cargo test -p fusabi-vm
 
 # Specific test
 cd rust && cargo test test_name
@@ -218,7 +218,7 @@ mod tests {
 
 ```rust
 // tests/test_feature.rs
-use fsrs_frontend::*;
+use fusabi_frontend::*;
 
 #[test]
 fn test_end_to_end_workflow() {
@@ -407,7 +407,7 @@ just bench-vm
 
 # Or manually
 cd rust && cargo bench --workspace
-cd rust && cargo bench -p fsrs-vm
+cd rust && cargo bench -p fusabi-vm
 ```
 
 ### Writing Benchmarks
@@ -417,7 +417,7 @@ Benchmarks are written using [Criterion.rs](https://github.com/bheisler/criterio
 ```rust
 // benches/vm_benchmarks.rs
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
-use fsrs_vm::{VM, Chunk, OpCode};
+use fusabi_vm::{VM, Chunk, OpCode};
 
 fn vm_arithmetic_benchmark(c: &mut Criterion) {
     let mut chunk = Chunk::new();
@@ -543,13 +543,13 @@ git push
 
 ```bash
 # 1. Write failing test
-vim rust/crates/fsrs-vm/tests/test_vm.rs
+vim rust/crates/fusabi-vm/tests/test_vm.rs
 
 # 2. Run test (should fail)
 just test-vm
 
 # 3. Implement feature
-vim rust/crates/fsrs-vm/src/vm.rs
+vim rust/crates/fusabi-vm/src/vm.rs
 
 # 4. Run test (should pass)
 just test-vm
@@ -569,26 +569,26 @@ just test-vm
 
 All test files are scaffolded with TODO comments for Phase 1 implementation:
 
-#### fsrs-frontend tests
+#### fusabi-frontend tests
 
-- `rust/crates/fsrs-frontend/tests/test_placeholder.rs`
+- `rust/crates/fusabi-frontend/tests/test_placeholder.rs`
   - Parser tests (TODO)
   - AST tests (TODO)
   - Lexer tests (TODO)
 
-#### fsrs-vm tests
+#### fusabi-vm tests
 
-- `rust/crates/fsrs-vm/tests/test_placeholder.rs`
+- `rust/crates/fusabi-vm/tests/test_placeholder.rs`
   - VM execution tests (TODO)
   - Bytecode chunk tests (TODO)
   - Value tests (TODO)
   - GC tests (TODO)
-- `rust/crates/fsrs-vm/benches/vm_benchmarks.rs`
+- `rust/crates/fusabi-vm/benches/vm_benchmarks.rs`
   - VM performance benchmarks (TODO)
 
-#### fsrs-demo tests
+#### fusabi-demo tests
 
-- `rust/crates/fsrs-demo/tests/test_integration.rs`
+- `rust/crates/fusabi-demo/tests/test_integration.rs`
   - Script execution tests (TODO)
   - Host interop tests (TODO)
   - Hot-reload tests (TODO)
@@ -678,4 +678,4 @@ just bench             # Run benchmarks
 4. Enable coverage tracking in CI
 5. Monitor CI build times and optimize
 
-For implementation details, see [CLAUDE_CODE_NOTES.md](CLAUDE_CODE_NOTES.md).
+For implementation details, see [claude-code-notes.md](claude-code-notes.md).

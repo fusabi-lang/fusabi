@@ -1,7 +1,7 @@
 # Issue #004: VM Value Representation
 
 ## Overview
-Define the runtime value representation for the FSRS bytecode VM. This includes the `Value` enum and associated types that represent all runtime values.
+Define the runtime value representation for the Fusabi bytecode VM. This includes the `Value` enum and associated types that represent all runtime values.
 
 ## Labels
 - `feature`, `phase-1: mvp`, `priority: high`, `foundational`, `parallel-safe`, `component: vm`, `effort: s` (1-2 days)
@@ -22,7 +22,7 @@ None - Can work in parallel with frontend
 ## Technical Specification
 
 ```rust
-// rust/crates/fsrs-vm/src/value.rs
+// rust/crates/fusabi-vm/src/value.rs
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Value {

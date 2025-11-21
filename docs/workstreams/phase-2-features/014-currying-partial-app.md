@@ -40,14 +40,14 @@ None (enhances existing features)
 ## Technical Specification
 
 ### File Locations
-- `rust/crates/fsrs-frontend/src/parser.rs` - Multi-parameter syntax
-- `rust/crates/fsrs-frontend/src/compiler.rs` - Currying compilation
+- `rust/crates/fusabi-frontend/src/parser.rs` - Multi-parameter syntax
+- `rust/crates/fusabi-frontend/src/compiler.rs` - Currying compilation
 - `rust/tests/currying_tests.rs` - Integration tests
 
 ### Parser Extension
 
 ```rust
-// rust/crates/fsrs-frontend/src/parser.rs
+// rust/crates/fusabi-frontend/src/parser.rs
 
 impl Parser {
     /// Parse function definition with multiple parameters
@@ -110,7 +110,7 @@ impl Parser {
 ### Compiler Strategy
 
 ```rust
-// rust/crates/fsrs-frontend/src/compiler.rs
+// rust/crates/fusabi-frontend/src/compiler.rs
 
 // Currying is handled at parse time (desugaring)
 // No special compiler support needed beyond closure support
@@ -179,7 +179,7 @@ impl Compiler {
 ### Unit Tests - Parser
 
 ```rust
-// rust/crates/fsrs-frontend/src/parser.rs
+// rust/crates/fusabi-frontend/src/parser.rs
 
 #[cfg(test)]
 mod tests {
@@ -296,7 +296,7 @@ fn test_function_composition() {
 ### Example Scripts
 
 ```fsharp
-// examples/currying/simple.fsrs
+// examples/currying/simple.fsx
 
 // Basic currying
 let add x y = x + y
@@ -314,7 +314,7 @@ add10_20 5  // Returns 35
 ```
 
 ```fsharp
-// examples/currying/higher-order.fsrs
+// examples/currying/higher-order.fsx
 
 // Map with curried functions
 let map f list =
@@ -344,7 +344,7 @@ filter greaterThan10 [5; 15; 8; 20; 12]
 ```
 
 ```fsharp
-// examples/currying/composition.fsrs
+// examples/currying/composition.fsx
 
 // Function composition
 let compose f g = fun x -> f (g x)

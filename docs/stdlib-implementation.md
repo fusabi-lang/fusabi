@@ -1,4 +1,4 @@
-# FSRS Standard Library Implementation
+# Fusabi Standard Library Implementation
 
 **Phase**: Phase 3 Cycle 2 - Advanced Features
 **Date**: 2025-11-19
@@ -6,14 +6,14 @@
 
 ## Overview
 
-The FSRS standard library provides essential built-in functions for working with Lists, Strings, and Options. This implementation gives FSRS scripts access to common operations out-of-the-box, without requiring external modules or host integration.
+The Fusabi standard library provides essential built-in functions for working with Lists, Strings, and Options. This implementation gives Fusabi scripts access to common operations out-of-the-box, without requiring external modules or host integration.
 
 ## Architecture
 
 ### Module Structure
 
 ```
-fsrs-vm/src/stdlib/
+fusabi-vm/src/stdlib/
 ├── mod.rs       - Registry and function lookup
 ├── list.rs      - List operations (cons-based)
 ├── string.rs    - String operations
@@ -284,7 +284,7 @@ This will enable direct stdlib calls from bytecode without explicit function loo
 ### Build
 
 ```bash
-cd rust/crates/fsrs-vm
+cd rust/crates/fusabi-vm
 cargo build
 ```
 
@@ -326,7 +326,7 @@ All public APIs are documented with:
 
 ## Summary
 
-The FSRS standard library provides a solid foundation of 19 essential functions across 3 modules:
+The Fusabi standard library provides a solid foundation of 19 essential functions across 3 modules:
 
 - **7 List functions** - Cons-based list operations
 - **9 String functions** - Unicode-aware string processing
@@ -339,4 +339,4 @@ All implementations:
 - ✅ Zero clippy warnings
 - ✅ Production-ready
 
-This establishes the groundwork for FSRS scripts to perform common operations without external dependencies, while maintaining the functional programming paradigm.
+This establishes the groundwork for Fusabi scripts to perform common operations without external dependencies, while maintaining the functional programming paradigm.

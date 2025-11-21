@@ -1,26 +1,26 @@
-# FSRS Module System
+# Fusabi Module System
 
 ## Overview
 
-The FSRS module system enables code organization and reusability through named modules, imports, and qualified names. This implementation follows F# module semantics.
+The Fusabi module system enables code organization and reusability through named modules, imports, and qualified names. This implementation follows F# module semantics.
 
 ## Architecture
 
 ### Core Components
 
-1. **AST Extensions** (`crates/fsrs-frontend/src/ast.rs`)
+1. **AST Extensions** (`crates/fusabi-frontend/src/ast.rs`)
    - `ModuleDef`: Named module with items
    - `ModuleItem`: Items that can appear in modules (let bindings, types, nested modules)
    - `Import`: Open/import statements
    - `Program`: Top-level structure with modules and main expression
 
-2. **Module Registry** (`crates/fsrs-frontend/src/modules.rs`)
+2. **Module Registry** (`crates/fusabi-frontend/src/modules.rs`)
    - `ModuleRegistry`: Registry for name resolution
    - `Module`: Compiled module with bindings and types
    - `ModulePath`: Path for nested modules
    - `TypeDefinition`: Type exports from modules
 
-3. **Lexer Updates** (`crates/fsrs-frontend/src/lexer.rs`)
+3. **Lexer Updates** (`crates/fusabi-frontend/src/lexer.rs`)
    - Added `Open` token for import statements
    - Added `Module` token for module definitions
 
@@ -201,32 +201,32 @@ let c = factorial 5    // 120
 
 ### Modified Files
 
-1. `/crates/fsrs-frontend/src/ast.rs`
+1. `/crates/fusabi-frontend/src/ast.rs`
    - Added `ModuleDef`, `ModuleItem`, `Import`, `Program` types
    - Added Display implementations
 
-2. `/crates/fsrs-frontend/src/lexer.rs`
+2. `/crates/fusabi-frontend/src/lexer.rs`
    - Added `Open` and `Module` tokens
    - Added keyword matching for "open" and "module"
 
-3. `/crates/fsrs-frontend/src/lib.rs`
+3. `/crates/fusabi-frontend/src/lib.rs`
    - Added `modules` module
    - Re-exported module-related types
 
 ### Created Files
 
-1. `/crates/fsrs-frontend/src/modules.rs`
+1. `/crates/fusabi-frontend/src/modules.rs`
    - Module registry implementation
    - Name resolution system
    - Type definitions for module system
 
-2. `/examples/modules_basic.fsrs`
+2. `/examples/modules_basic.fsx`
    - Basic module usage example
 
-3. `/examples/modules_nested.fsrs`
+3. `/examples/modules_nested.fsx`
    - Nested modules example
 
-4. `/examples/modules_math.fsrs`
+4. `/examples/modules_math.fsx`
    - Math library module example
 
 5. `/docs/module_system.md`
@@ -237,7 +237,7 @@ let c = factorial 5    // 120
 The module system includes unit tests in `modules.rs`:
 
 ```bash
-cargo test --package fsrs-frontend modules
+cargo test --package fusabi-frontend modules
 ```
 
 Key test coverage:
@@ -302,9 +302,9 @@ To fully integrate the module system:
 ## Related Documentation
 
 - [F# Module Documentation](https://docs.microsoft.com/en-us/dotnet/fsharp/language-reference/modules)
-- [FSRS AST Documentation](../crates/fsrs-frontend/src/ast.rs)
-- [FSRS Parser Documentation](../crates/fsrs-frontend/src/parser.rs)
+- [FSRS AST Documentation](../crates/fusabi-frontend/src/ast.rs)
+- [FSRS Parser Documentation](../crates/fusabi-frontend/src/parser.rs)
 
 ## Conclusion
 
-The module system provides a solid foundation for code organization in FSRS. The current implementation includes the core data structures and registry system. The next phase will add parser support and compiler integration to make the system fully functional.
+The module system provides a solid foundation for code organization in Fusabi. The current implementation includes the core data structures and registry system. The next phase will add parser support and compiler integration to make the system fully functional.

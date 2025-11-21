@@ -98,7 +98,7 @@ All tests demonstrate full pipeline: Source → Tokens → AST (Program) → Com
 
 **Example Usage**:
 ```rust
-use fsrs_frontend::compile_program_from_source;
+use fusabi_frontend::compile_program_from_source;
 
 let source = r#"
 module Math =
@@ -120,12 +120,12 @@ let chunk = compile_program_from_source(source).unwrap();
 ✅ **Zero compilation warnings**
 
 ### Files Modified
-- `rust/crates/fsrs-frontend/src/compiler.rs` (+250 lines)
-- `rust/crates/fsrs-frontend/src/lib.rs` (+27 lines)
+- `rust/crates/fusabi-frontend/src/compiler.rs` (+250 lines)
+- `rust/crates/fusabi-frontend/src/lib.rs` (+27 lines)
 
 ### Files Created
-- `rust/crates/fsrs-frontend/tests/compiler_modules.rs` (429 lines)
-- `examples/modules_compiled.fsrs` (example script)
+- `rust/crates/fusabi-frontend/tests/compiler_modules.rs` (429 lines)
+- `examples/modules_compiled.fsx` (example script)
 - `docs/compiler-modules-integration.md` (documentation)
 
 ---
@@ -133,7 +133,7 @@ let chunk = compile_program_from_source(source).unwrap();
 ## Agent 2: Host Interop API
 
 ### Mission
-Build a comprehensive host interop API enabling Rust applications to embed FSRS and register native functions.
+Build a comprehensive host interop API enabling Rust applications to embed Fusabi and register native functions.
 
 ### Deliverables
 
@@ -174,8 +174,8 @@ impl HostRegistry {
 
 #### 2. Type Conversions (conversions.rs - 291 lines)
 **Bidirectional Marshalling**:
-- Rust → FSRS: `From<T> for Value`
-- FSRS → Rust: `TryFrom<Value> for T`
+- Rust → Fusabi: `From<T> for Value`
+- Fusabi → Rust: `TryFrom<Value> for T`
 
 **Supported Types**:
 ```rust
@@ -238,8 +238,8 @@ impl FsrsEngine {
 
 **Example Usage**:
 ```rust
-use fsrs_demo::host_api::FsrsEngine;
-use fsrs_vm::Value;
+use fusabi_demo::host_api::FsrsEngine;
+use fusabi_vm::Value;
 
 let mut engine = FsrsEngine::new();
 
@@ -301,17 +301,17 @@ All tests passing
 ✅ **Zero clippy warnings**
 
 ### Files Created
-- `rust/crates/fsrs-vm/src/host.rs` (228 lines)
-- `rust/crates/fsrs-vm/src/conversions.rs` (291 lines)
-- `rust/crates/fsrs-demo/src/host_api.rs` (294 lines)
-- `rust/crates/fsrs-vm/tests/test_host_interop.rs` (278 lines)
+- `rust/crates/fusabi-vm/src/host.rs` (228 lines)
+- `rust/crates/fusabi-vm/src/conversions.rs` (291 lines)
+- `rust/crates/fusabi-demo/src/host_api.rs` (294 lines)
+- `rust/crates/fusabi-vm/tests/test_host_interop.rs` (278 lines)
 - `examples/host_interop_demo.rs` (example code)
 - `docs/host_interop_implementation.md` (documentation)
 - `docs/host_interop_demo.md` (tutorial)
 
 ### Files Modified
-- `rust/crates/fsrs-vm/src/lib.rs` (+host module exports)
-- `rust/crates/fsrs-demo/src/lib.rs` (+host_api module)
+- `rust/crates/fusabi-vm/src/lib.rs` (+host module exports)
+- `rust/crates/fusabi-demo/src/lib.rs` (+host_api module)
 
 ---
 
@@ -372,7 +372,7 @@ After Cycle 3:
 ### Host Interop API (Complete)
 ✅ HostRegistry system
 ✅ Multi-arity function registration
-✅ Type marshalling (Rust ↔ FSRS)
+✅ Type marshalling (Rust ↔ Fusabi)
 ✅ FsrsEngine high-level API
 ✅ Thread-safe function storage
 ✅ Comprehensive error handling
@@ -404,7 +404,7 @@ After Cycle 3:
 
 ### Complete Module Compilation
 ```rust
-use fsrs_frontend::compile_program_from_source;
+use fusabi_frontend::compile_program_from_source;
 
 let source = r#"
 module Math =
@@ -425,8 +425,8 @@ let chunk = compile_program_from_source(source)?;
 
 ### Host Function Registration
 ```rust
-use fsrs_demo::host_api::FsrsEngine;
-use fsrs_vm::Value;
+use fusabi_demo::host_api::FsrsEngine;
+use fusabi_vm::Value;
 
 let mut engine = FsrsEngine::new();
 
@@ -460,7 +460,7 @@ let combined = engine.call_host("string_concat", &[
 - Integrate HostRegistry with VM execution
 - Add OpCode for host function calls
 - Handle host function errors in VM
-- Test end-to-end: FSRS calls host function
+- Test end-to-end: Fusabi calls host function
 
 ### Priority 2: Standard Library Expansion
 - Implement List.map, List.filter, List.fold

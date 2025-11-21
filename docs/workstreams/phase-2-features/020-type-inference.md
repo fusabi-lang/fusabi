@@ -37,7 +37,7 @@ Frontend (Developer 1)
 
 ### Type System
 ```rust
-// fsrs-frontend/src/types.rs
+// fusabi-frontend/src/types.rs
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Type {
@@ -71,7 +71,7 @@ pub type Substitution = HashMap<TypeVar, Type>;
 
 ### Type Inference Engine
 ```rust
-// fsrs-frontend/src/inference.rs
+// fusabi-frontend/src/inference.rs
 
 pub struct TypeInference {
     next_var: u32,

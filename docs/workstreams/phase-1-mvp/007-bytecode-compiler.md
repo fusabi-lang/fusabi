@@ -24,11 +24,11 @@ Phase 1.3: Integration (Week 3)
 ## Technical Specification
 
 ```rust
-// rust/crates/fsrs-frontend/src/compiler.rs
+// rust/crates/fusabi-frontend/src/compiler.rs
 
 use crate::ast::{Expr, Literal, BinOp};
-use fsrs_vm::bytecode::{Chunk, Instruction};
-use fsrs_vm::value::Value;
+use fusabi_vm::bytecode::{Chunk, Instruction};
+use fusabi_vm::value::Value;
 
 pub struct Compiler {
     chunk: Chunk,

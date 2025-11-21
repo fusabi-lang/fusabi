@@ -2,13 +2,13 @@
 
 ## Overview
 
-This document summarizes the compiler integration preparation for type checking in FSRS (Issue #30, Part 1/2).
+This document summarizes the compiler integration preparation for type checking in Fusabi (Issue #30, Part 1/2).
 
 ## What Was Implemented
 
 ### 1. Typed AST Module (`typed_ast.rs`)
 
-**Location**: `crates/fsrs-frontend/src/typed_ast.rs`
+**Location**: `crates/fusabi-frontend/src/typed_ast.rs`
 
 Created optional typed AST representations:
 
@@ -24,7 +24,7 @@ Created optional typed AST representations:
 
 ### 2. Enhanced Compiler with Type Checking Hooks
 
-**Location**: `crates/fsrs-frontend/src/compiler.rs`
+**Location**: `crates/fusabi-frontend/src/compiler.rs`
 
 Added compiler integration points:
 
@@ -66,9 +66,9 @@ Currently initializes empty type environment. Ready to be replaced with full Hin
 
 **Tests**: 3 new compiler tests
 
-### 3. fsrs-demo Integration
+### 3. fusabi-demo Integration
 
-**Location**: `crates/fsrs-demo/src/lib.rs`
+**Location**: `crates/fusabi-demo/src/lib.rs`
 
 Added high-level APIs with type checking support:
 
@@ -94,7 +94,7 @@ pub struct RunOptions {
 
 ### 4. Comprehensive Integration Tests
 
-**Location**: `crates/fsrs-demo/tests/test_type_checking.rs`
+**Location**: `crates/fusabi-demo/tests/test_type_checking.rs`
 
 Created 35 integration tests covering:
 
@@ -143,7 +143,7 @@ All 35 tests pass.
 
 ### 5. Module Exports
 
-**Location**: `crates/fsrs-frontend/src/lib.rs`
+**Location**: `crates/fusabi-frontend/src/lib.rs`
 
 Updated exports to include:
 
@@ -170,7 +170,7 @@ Comprehensive documentation covering:
 
 - ✅ CompileOptions for enabling/disabling type checking
 - ✅ Type checking hook in compiler
-- ✅ Integration with fsrs-demo
+- ✅ Integration with fusabi-demo
 - ✅ Backward compatibility maintained (all existing tests pass)
 - ✅ 35+ integration tests (35 tests created)
 - ✅ Clear API documentation
@@ -183,7 +183,7 @@ test result: ok. 35 passed; 0 failed; 0 ignored
 ```
 
 Additional:
-- 18 library tests in fsrs-demo
+- 18 library tests in fusabi-demo
 - 8 unit tests in typed_ast
 - 3 compiler tests
 - All existing tests continue to pass
@@ -245,15 +245,15 @@ When type inference is complete:
 ## Files Changed
 
 ### New Files
-- `crates/fsrs-frontend/src/typed_ast.rs` (211 lines)
-- `crates/fsrs-demo/tests/test_type_checking.rs` (332 lines)
+- `crates/fusabi-frontend/src/typed_ast.rs` (211 lines)
+- `crates/fusabi-demo/tests/test_type_checking.rs` (332 lines)
 - `docs/compiler-integration.md` (279 lines)
 - `docs/compiler-integration-summary.md` (this file)
 
 ### Modified Files
-- `crates/fsrs-frontend/src/compiler.rs` (enhanced with type checking)
-- `crates/fsrs-frontend/src/lib.rs` (added exports)
-- `crates/fsrs-demo/src/lib.rs` (added new APIs and options)
+- `crates/fusabi-frontend/src/compiler.rs` (enhanced with type checking)
+- `crates/fusabi-frontend/src/lib.rs` (added exports)
+- `crates/fusabi-demo/src/lib.rs` (added new APIs and options)
 
 ## Performance Impact
 

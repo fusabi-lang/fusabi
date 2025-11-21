@@ -44,15 +44,15 @@ VM (Developer 2)
 ## Technical Specification
 
 ### File Locations
-- `rust/crates/fsrs-vm/src/value.rs` - Closure value type
-- `rust/crates/fsrs-vm/src/closure.rs` - Closure implementation (NEW)
-- `rust/crates/fsrs-vm/src/bytecode.rs` - New instructions
-- `rust/crates/fsrs-vm/src/vm.rs` - Closure execution
+- `rust/crates/fusabi-vm/src/value.rs` - Closure value type
+- `rust/crates/fusabi-vm/src/closure.rs` - Closure implementation (NEW)
+- `rust/crates/fusabi-vm/src/bytecode.rs` - New instructions
+- `rust/crates/fusabi-vm/src/vm.rs` - Closure execution
 
 ### Core Types
 
 ```rust
-// rust/crates/fsrs-vm/src/closure.rs
+// rust/crates/fusabi-vm/src/closure.rs
 
 use std::rc::Rc;
 use std::cell::RefCell;
@@ -139,7 +139,7 @@ impl Closure {
 ### Value Extension
 
 ```rust
-// rust/crates/fsrs-vm/src/value.rs
+// rust/crates/fusabi-vm/src/value.rs
 
 use crate::closure::Closure;
 use std::rc::Rc;
@@ -172,7 +172,7 @@ impl Value {
 ### Bytecode Instructions
 
 ```rust
-// rust/crates/fsrs-vm/src/bytecode.rs
+// rust/crates/fusabi-vm/src/bytecode.rs
 
 #[derive(Debug, Clone)]
 pub enum Instruction {
@@ -209,7 +209,7 @@ pub enum Instruction {
 ### VM Implementation
 
 ```rust
-// rust/crates/fsrs-vm/src/vm.rs
+// rust/crates/fusabi-vm/src/vm.rs
 
 use crate::closure::{Closure, Upvalue};
 use std::rc::Rc;
@@ -379,7 +379,7 @@ impl VM {
 ### Unit Tests
 
 ```rust
-// rust/crates/fsrs-vm/src/closure.rs
+// rust/crates/fusabi-vm/src/closure.rs
 
 #[cfg(test)]
 mod tests {
@@ -485,7 +485,7 @@ fn test_higher_order_function() {
 ### Example Scripts
 
 ```fsharp
-// examples/closures/simple.fsrs
+// examples/closures/simple.fsx
 
 // Simple closure capturing one variable
 let x = 42

@@ -69,15 +69,15 @@ All tests demonstrate full pipeline: Source → Tokens → AST (Program) → Mod
 ✅ **Full backward compatibility maintained**
 
 ### Files Modified
-- `rust/crates/fsrs-frontend/src/parser.rs` (+400 lines)
-- `rust/crates/fsrs-frontend/tests/module_integration.rs` (New, 273 lines)
+- `rust/crates/fusabi-frontend/src/parser.rs` (+400 lines)
+- `rust/crates/fusabi-frontend/tests/module_integration.rs` (New, 273 lines)
 
 ---
 
 ## Agent 2: Standard Library Foundation
 
 ### Mission
-Build List, String, and Option modules with essential operations for FSRS users.
+Build List, String, and Option modules with essential operations for Fusabi users.
 
 ### Deliverables
 
@@ -139,7 +139,7 @@ pub struct StdlibRegistry {
 
 All tests passing
 
-#### 6. Example Scripts (stdlib_demo.fsrs - 3.6 KB)
+#### 6. Example Scripts (stdlib_demo.fsx - 3.6 KB)
 Complete usage examples for all 19 functions with real-world use cases.
 
 #### 7. Documentation
@@ -153,17 +153,17 @@ Complete usage examples for all 19 functions with real-world use cases.
 ✅ **Zero clippy warnings**
 
 ### Files Created
-- `rust/crates/fsrs-vm/src/stdlib/mod.rs` (187 lines)
-- `rust/crates/fsrs-vm/src/stdlib/list.rs` (306 lines)
-- `rust/crates/fsrs-vm/src/stdlib/string.rs` (333 lines)
-- `rust/crates/fsrs-vm/src/stdlib/option.rs` (149 lines)
-- `rust/crates/fsrs-vm/tests/test_stdlib.rs` (273 lines)
-- `examples/stdlib_demo.fsrs` (3.6 KB)
+- `rust/crates/fusabi-vm/src/stdlib/mod.rs` (187 lines)
+- `rust/crates/fusabi-vm/src/stdlib/list.rs` (306 lines)
+- `rust/crates/fusabi-vm/src/stdlib/string.rs` (333 lines)
+- `rust/crates/fusabi-vm/src/stdlib/option.rs` (149 lines)
+- `rust/crates/fusabi-vm/tests/test_stdlib.rs` (273 lines)
+- `examples/stdlib_demo.fsx` (3.6 KB)
 - `docs/stdlib-implementation.md` (9.1 KB)
 - `docs/stdlib-summary.md` (5.2 KB)
 
 ### Files Modified
-- `rust/crates/fsrs-vm/src/lib.rs` (Added stdlib module export)
+- `rust/crates/fusabi-vm/src/lib.rs` (Added stdlib module export)
 
 ---
 
@@ -256,7 +256,7 @@ After Cycle 2:
 
 ### Priority 2: Host Interop API
 - Host function registration
-- Value marshalling (Rust ↔ FSRS)
+- Value marshalling (Rust ↔ Fusabi)
 - Callback support
 - Error propagation
 

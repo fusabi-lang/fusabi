@@ -33,7 +33,7 @@ Frontend (Developer 1)
 
 ### AST Extension
 ```rust
-// fsrs-frontend/src/ast.rs
+// fusabi-frontend/src/ast.rs
 #[derive(Debug, Clone, PartialEq)]
 pub enum Expr {
     List(Vec<Expr>),           // [1; 2; 3]
@@ -53,7 +53,7 @@ pub enum Pattern {
 
 ### Value Extension
 ```rust
-// fsrs-vm/src/value.rs
+// fusabi-vm/src/value.rs
 #[derive(Debug, Clone)]
 pub enum Value {
     List(Rc<ListNode>),

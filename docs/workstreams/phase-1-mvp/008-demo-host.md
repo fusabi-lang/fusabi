@@ -15,7 +15,7 @@ Phase 1.3: Integration (Week 3)
 - #007 (Compiler) - MUST BE COMPLETE
 
 ## Acceptance Criteria
-- [ ] Load .fsrs files from examples/
+- [ ] Load .fsx files from examples/
 - [ ] Full pipeline: parse → compile → execute
 - [ ] Display results
 - [ ] Error reporting
@@ -24,10 +24,10 @@ Phase 1.3: Integration (Week 3)
 ## Technical Specification
 
 ```rust
-// rust/crates/fsrs-demo/src/main.rs
+// rust/crates/fusabi-demo/src/main.rs
 
-use fsrs_frontend::{lexer::Lexer, parser::Parser, compiler::Compiler};
-use fsrs_vm::vm::Vm;
+use fusabi_frontend::{lexer::Lexer, parser::Parser, compiler::Compiler};
+use fusabi_vm::vm::Vm;
 use std::fs;
 
 fn main() {
@@ -36,7 +36,7 @@ fn main() {
     let script_path = if args.len() > 1 {
         &args[1]
     } else {
-        "../examples/arithmetic.fsrs"
+        "../examples/arithmetic.fsx"
     };
 
     match run_script(script_path) {
@@ -45,7 +45,7 @@ fn main() {
     }
 }
 
-fn run_script(path: &str) -> Result<fsrs_vm::value::Value, Box<dyn std::error::Error>> {
+fn run_script(path: &str) -> Result<fusabi_vm::value::Value, Box<dyn std::error::Error>> {
     // 1. Read source
     let source = fs::read_to_string(path)?;
 
@@ -74,13 +74,13 @@ fn run_script(path: &str) -> Result<fsrs_vm::value::Value, Box<dyn std::error::E
 ## Example Scripts
 
 ```fsharp
-// examples/arithmetic.fsrs
+// examples/arithmetic.fsx
 1 + 2 * 3
 
-// examples/conditional.fsrs
+// examples/conditional.fsx
 if true then 42 else 0
 
-// examples/let_binding.fsrs
+// examples/let_binding.fsx
 let x = 10 in x + 5
 ```
 

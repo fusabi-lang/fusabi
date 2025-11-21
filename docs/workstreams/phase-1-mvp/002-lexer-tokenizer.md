@@ -31,7 +31,7 @@ None - Can work in parallel with #001 (AST)
 ## Technical Specification
 
 ### File Location
-`rust/crates/fsrs-frontend/src/lexer.rs`
+`rust/crates/fusabi-frontend/src/lexer.rs`
 
 ### Token Types
 

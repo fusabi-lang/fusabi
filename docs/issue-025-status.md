@@ -3,7 +3,7 @@
 ## Current Status
 
 ### Completed
-1. **Test file created**: `/rust/crates/fsrs-frontend/tests/list_tests.rs`
+1. **Test file created**: `/rust/crates/fusabi-frontend/tests/list_tests.rs`
    - 25+ comprehensive tests defined
    - Empty lists, single/multiple elements
    - Cons operator tests
@@ -119,12 +119,12 @@ Given the linter issue, recommend:
 
 ```bash
 # Build and test
-cd /home/beengud/raibid-labs/fsrs/rust
+cd /home/beengud/fusabi-lang/fusabi/rust
 cargo build
 cargo test --test list_tests
 
 # Check specific file
-cargo check --package fsrs-frontend
+cargo check --package fusabi-frontend
 
 # Run all tests
 cargo test

@@ -749,6 +749,132 @@ impl Vm {
         Ok(())
     }
 
+    /// Call a closure from native host functions
+    /// This allows host functions to call back into the VM, enabling higher-order functions
+    pub fn call_closure(&mut self, closure: Value, args: &[Value]) -> Result<Value, VmError> {
+        use crate::closure::Closure;
+
+        // Extract the closure from the value
+        let closure_rc = match closure.as_closure() {
+            Some(c) => c,
+            None => return Err(VmError::Runtime(format!("Expected closure, got {}", closure.type_name()))),
+        };
+
+        // Check arity matches
+        if args.len() != closure_rc.arity as usize {
+            return Err(VmError::Runtime(format!(
+                "Closure expects {} arguments, got {}",
+                closure_rc.arity,
+                args.len()
+            )));
+        }
+
+        // Save the current stack size for cleanup
+        let base = self.stack.len();
+
+        // Push arguments onto the stack as locals for the new frame
+        for arg in args {
+            self.push(arg.clone());
+        }
+
+        // Create a new frame for the closure
+        let frame = Frame::new(closure_rc.chunk.clone(), base);
+
+        // Check for call stack overflow
+        const MAX_CALL_DEPTH: usize = 256;
+        if self.frames.len() >= MAX_CALL_DEPTH {
+            return Err(VmError::CallStackOverflow);
+        }
+
+        self.frames.push(frame);
+
+        // Execute the closure bytecode - simplified execution
+        let result = loop {
+            // Get current frame
+            let frame = self.current_frame_mut()?;
+
+            // Fetch next instruction
+            let instruction = frame.fetch_instruction()?;
+
+            // Handle the Return instruction specially
+            if matches!(instruction, Instruction::Return) {
+                // Pop the closure frame
+                let frame = self.frames.pop().ok_or(VmError::NoActiveFrame)?;
+
+                // Get the return value from the stack (should be at the top)
+                let result = if self.stack.len() > frame.base {
+                    self.stack.pop().unwrap()
+                } else {
+                    Value::Unit
+                };
+
+                break result;
+            }
+
+            // For other instructions, we execute them normally
+            // Note: This is a simplified version - a full implementation would
+            // handle all instructions properly in a re-entrant way
+            match instruction {
+                Instruction::LoadConst(idx) => {
+                    let frame = self.current_frame_mut()?;
+                    let constant = frame.get_constant(idx)?;
+                    self.push(constant);
+                }
+                Instruction::LoadLocal(idx) => {
+                    let value = self.get_local(idx)?;
+                    self.push(value);
+                }
+                Instruction::StoreLocal(idx) => {
+                    let value = self.pop()?;
+                    self.set_local(idx, value)?;
+                }
+                Instruction::Pop => {
+                    self.pop()?;
+                }
+                Instruction::Dup => {
+                    let value = self.peek()?;
+                    self.push(value.clone());
+                }
+                // Arithmetic operations
+                Instruction::Add => {
+                    let b = self.pop_int()?;
+                    let a = self.pop_int()?;
+                    self.push(Value::Int(a + b));
+                }
+                Instruction::Sub => {
+                    let b = self.pop_int()?;
+                    let a = self.pop_int()?;
+                    self.push(Value::Int(a - b));
+                }
+                Instruction::Mul => {
+                    let b = self.pop_int()?;
+                    let a = self.pop_int()?;
+                    self.push(Value::Int(a * b));
+                }
+                Instruction::Div => {
+                    let b = self.pop_int()?;
+                    let a = self.pop_int()?;
+                    if b == 0 {
+                        return Err(VmError::DivisionByZero);
+                    }
+                    self.push(Value::Int(a / b));
+                }
+                _ => {
+                    // For now, other instructions are not supported in closures
+                    // In a full implementation, all instructions would be handled
+                    return Err(VmError::Runtime(
+                        format!("Instruction {:?} not yet supported in closures", instruction)
+                    ));
+                }
+            }
+        };
+
+        // Clean up the stack to where it was before the call
+        self.stack.truncate(base);
+
+        Ok(result)
+    }
+
     /// Get the current stack size (for debugging)
     pub fn stack_size(&self) -> usize {
         self.stack.len()

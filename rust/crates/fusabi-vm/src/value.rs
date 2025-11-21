@@ -1,6 +1,7 @@
 // Fusabi VM Value Representation
 // Defines runtime values for the bytecode VM
 
+use crate::closure::Closure;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::fmt;
@@ -35,6 +36,8 @@ pub enum Value {
         variant_name: String,
         fields: Vec<Value>,
     },
+    /// Closure - a function with captured variables
+    Closure(Rc<Closure>),
 }
 
 impl Value {

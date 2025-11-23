@@ -1,5 +1,10 @@
 # Fusabi 🟢
 
+[![CI](https://github.com/fusabi-lang/fusabi/actions/workflows/ci.yml/badge.svg)](https://github.com/fusabi-lang/fusabi/actions/workflows/ci.yml)
+[![Crates.io](https://img.shields.io/crates/v/fusabi.svg)](https://crates.io/crates/fusabi)
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![GitHub stars](https://img.shields.io/github/stars/fusabi-lang/fusabi.svg)](https://github.com/fusabi-lang/fusabi/stargazers)
+
 **Small. Potent. Functional.**
 
 Fusabi is a high-performance embedded scripting engine for Rust. It allows you to write type-safe F# logic that binds directly to your Rust application's ABI.
@@ -74,3 +79,7 @@ MIT License - See LICENSE file for details.
 ## Repository
 
 https://github.com/fusabi-lang/fusabi
+
+## Star History
+
+[![Star History Chart](https://api.star-history.com/svg?repos=fusabi-lang/fusabi&type=Date)](https://star-history.com/#fusabi-lang/fusabi&Date)

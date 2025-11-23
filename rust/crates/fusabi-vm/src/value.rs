@@ -96,7 +96,7 @@ impl Value {
     }
 
     /// Attempts to extract a tuple reference from the value
-    /// Returns Some(&Vec<Value>) if the value is Tuple, None otherwise
+    /// Returns Some(&`Vec<Value>`) if the value is Tuple, None otherwise
     pub fn as_tuple(&self) -> Option<&Vec<Value>> {
         match self {
             Value::Tuple(elements) => Some(elements),
@@ -166,7 +166,7 @@ impl Value {
     }
 
     /// Attempts to extract an array reference from the value
-    /// Returns Some(Rc<RefCell<Vec<Value>>>) if the value is Array, None otherwise
+    /// Returns Some(`Rc<RefCell<Vec<Value>>>`) if the value is Array, None otherwise
     pub fn as_array(&self) -> Option<Rc<RefCell<Vec<Value>>>> {
         if let Value::Array(arr) = self {
             Some(arr.clone())
@@ -176,7 +176,7 @@ impl Value {
     }
 
     /// Attempts to extract a record reference from the value
-    /// Returns Some(Rc<RefCell<HashMap<String, Value>>>) if the value is Record, None otherwise
+    /// Returns Some(`Rc<RefCell<HashMap<String, Value>>>`) if the value is Record, None otherwise
     pub fn as_record(&self) -> Option<Rc<RefCell<HashMap<String, Value>>>> {
         if let Value::Record(fields) = self {
             Some(fields.clone())
@@ -354,7 +354,7 @@ impl Value {
     }
 
     /// Attempts to extract a closure reference from the value
-    /// Returns Some(Rc<Closure>) if the value is Closure, None otherwise
+    /// Returns Some(`Rc<Closure>`) if the value is Closure, None otherwise
     pub fn as_closure(&self) -> Option<Rc<Closure>> {
         if let Value::Closure(c) = self {
             Some(c.clone())

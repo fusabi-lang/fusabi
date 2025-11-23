@@ -20,6 +20,9 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Install just
+        uses: taiki-e/install-action@just
+
       - name: Setup Rust toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
@@ -58,6 +61,9 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
+      - name: Install just
+        uses: taiki-e/install-action@just
 
       - name: Setup Rust toolchain
         uses: dtolnay/rust-toolchain@master
@@ -100,6 +106,9 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Install just
+        uses: taiki-e/install-action@just
+
       - name: Setup Rust toolchain
         uses: dtolnay/rust-toolchain@stable
 
@@ -114,8 +123,8 @@ jobs:
       - name: Upload demo binary
         uses: actions/upload-artifact@v4
         with:
-          name: fsrs-demo-linux
-          path: rust/target/release/fsrs-demo
+          name: fusabi-linux
+          path: rust/target/release/fus
           if-no-files-found: warn
 
   # Code coverage with tarpaulin
@@ -177,6 +186,9 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
+      - name: Install just
+        uses: taiki-e/install-action@just
 
       - name: Setup Rust toolchain
         uses: dtolnay/rust-toolchain@stable

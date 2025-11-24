@@ -13,6 +13,7 @@ use std::fs;
 
 /// Example context configuration struct
 #[derive(Debug)]
+#[allow(dead_code)]
 struct Context {
     name: String,
     max_tokens: i64,
@@ -22,6 +23,7 @@ struct Context {
 
 impl Context {
     /// Convert a Fusabi record value to a Context struct
+    #[allow(dead_code)]
     fn from_fusabi_value(value: &Value) -> Result<Self, String> {
         // For this example, we expect a record with specific fields
         // In a real implementation, you'd use proper record field access
@@ -102,7 +104,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     println!("\n=== Integration Complete ===");
     println!("\nTo use Fusabi in your Phage project:");
-    println!("1. Add to Cargo.toml: fusabi = {{ git = \"https://github.com/fusabi-lang/fusabi\" }}");
+    println!(
+        "1. Add to Cargo.toml: fusabi = {{ git = \"https://github.com/fusabi-lang/fusabi\" }}"
+    );
     println!("2. Import: use fusabi::{{Engine, Value}};");
     println!("3. Create engine: let mut engine = Engine::new();");
     println!("4. Evaluate scripts: let result = engine.eval(script_content)?;");

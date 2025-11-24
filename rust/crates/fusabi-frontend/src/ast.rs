@@ -1037,6 +1037,8 @@ pub struct Program {
     pub modules: Vec<ModuleDef>,
     /// Import statements
     pub imports: Vec<Import>,
+    /// Top-level items (let bindings, types, etc.)
+    pub items: Vec<ModuleItem>,
     /// Main expression to evaluate (if any)
     pub main_expr: Option<Expr>,
 }
@@ -1056,8 +1058,18 @@ impl fmt::Display for Program {
             }
             write!(f, "{}", module)?;
         }
+        if !self.modules.is_empty() && !self.items.is_empty() {
+            writeln!(f)?;
+            writeln!(f)?;
+        }
+        for (i, item) in self.items.iter().enumerate() {
+            if i > 0 {
+                writeln!(f)?;
+            }
+            write!(f, "{}", item)?;
+        }
         if let Some(ref expr) = self.main_expr {
-            if !self.modules.is_empty() {
+            if !self.modules.is_empty() || !self.items.is_empty() {
                 writeln!(f)?;
                 writeln!(f)?;
             }

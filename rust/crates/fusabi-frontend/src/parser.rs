@@ -128,6 +128,12 @@ impl std::error::Error for ParseError {}
 
 type Result<T> = std::result::Result<T, ParseError>;
 
+/// Result of parsing a `let` construct, which could be a ModuleItem or an Expr
+enum LetResult {
+    Item(ModuleItem),
+    Expr(Expr),
+}
+
 /// Recursive-descent parser for Mini-F# expressions.
 pub struct Parser {
     tokens: Vec<TokenWithPos>,
@@ -166,6 +172,8 @@ impl Parser {
     pub fn parse_program(&mut self) -> Result<Program> {
         let mut imports = vec![];
         let mut modules = vec![];
+        let mut items = vec![];
+        let mut main_expr = None;
 
         // Parse imports first
         while self.peek() == Some(&Token::Open) {
@@ -177,16 +185,45 @@ impl Parser {
             modules.push(self.parse_module()?);
         }
 
-        // Parse main expression (if any)
-        let main_expr = if !self.is_at_end() {
-            Some(self.parse_expr()?)
-        } else {
-            None
-        };
+        // Parse top-level items and main expression
+        while !self.is_at_end() {
+            let tok = self.current_token();
+            match tok.token {
+                Token::Let => {
+                    // Check if it's a top-level binding or a let expression
+                    // We parse the binding part first
+                    let binding = self.parse_let_binding_or_expr()?;
+                    match binding {
+                        LetResult::Item(item) => items.push(item),
+                        LetResult::Expr(expr) => {
+                            main_expr = Some(expr);
+                            // If we found a main expression (e.g., let ... in ...),
+                            // we shouldn't expect more top-level items unless they are part of that expression
+                            // (which parse_expr handles).
+                            // However, if there's trailing junk, verify EOF?
+                            // For now, let's assume this completes the program or fail if more follows?
+                            // F# doesn't really allow `let ... in ...; let ...` at top level.
+                            break;
+                        }
+                    }
+                }
+                Token::Type => {
+                    let type_def = self.parse_type_def()?;
+                    items.push(ModuleItem::TypeDef(type_def));
+                }
+                _ => {
+                    // Assume main expression
+                    let expr = self.parse_expr()?;
+                    main_expr = Some(expr);
+                    break;
+                }
+            }
+        }
 
         Ok(Program {
             modules,
             imports,
+            items,
             main_expr,
         })
     }
@@ -215,8 +252,23 @@ impl Parser {
 
             match tok {
                 Token::Let => {
-                    let (name, expr) = self.parse_let_binding_parts()?;
-                    items.push(ModuleItem::Let(name, expr));
+                    // Inside a module, we expect items, but let's handle potential ambiguity properly
+                    // although technically 'in' is not valid inside a module unless it's inside an expr.
+                    // But parse_let_binding_or_expr handles top-level context.
+                    // For modules, we expect declarations.
+                    // However, parse_let_binding_parts is what we used before.
+                    // Let's use parse_let_binding_or_expr and ensure it returns an Item.
+                    let result = self.parse_let_binding_or_expr()?;
+                    match result {
+                        LetResult::Item(item) => items.push(item),
+                        LetResult::Expr(_) => {
+                            return Err(ParseError::UnexpectedToken {
+                                expected: "module item".to_string(),
+                                found: Token::In,
+                                pos: self.current_token().pos,
+                            });
+                        }
+                    }
                 }
                 Token::Type => {
                     let type_def = self.parse_type_def()?;
@@ -229,33 +281,128 @@ impl Parser {
         Ok(items)
     }
 
-    /// Helper: parse let binding and return (name, expr) without the 'in' part
-    fn parse_let_binding_parts(&mut self) -> Result<(String, Expr)> {
+    /// Helper: parse a let construct that could be a binding or an expression
+    fn parse_let_binding_or_expr(&mut self) -> Result<LetResult> {
         self.expect_token(Token::Let)?;
 
-        // Check for "rec" keyword - skip for now in modules
-        let _is_rec = self.match_token(&Token::Rec);
+        // Check for "rec" keyword
+        let is_rec = self.match_token(&Token::Rec);
 
-        let name = self.expect_ident()?;
+        if is_rec {
+            // Recursive binding(s)
+            let first_name = self.expect_ident()?;
+            let mut params = vec![];
+            while let Token::Ident(_) = &self.current_token().token {
+                params.push(self.expect_ident()?);
+            }
 
-        // Handle parameters: let f x y = ...
-        let mut params = vec![];
-        while self.peek_is_identifier() && !self.peek_is(&Token::Eq) {
-            params.push(self.expect_ident()?);
+            self.expect_token(Token::Eq)?;
+            let mut first_value = self.parse_expr()?;
+
+            // Desugar params
+            if !params.is_empty() {
+                first_value =
+                    params
+                        .into_iter()
+                        .rev()
+                        .fold(first_value, |acc, param| Expr::Lambda {
+                            param,
+                            body: Box::new(acc),
+                        });
+            }
+
+            // Check for mutual recursion ('and')
+            if self.match_token(&Token::AndKeyword) {
+                let mut bindings = vec![(first_name, first_value)];
+
+                loop {
+                    let name = self.expect_ident()?;
+                    let mut params = vec![];
+                    while let Token::Ident(_) = &self.current_token().token {
+                        params.push(self.expect_ident()?);
+                    }
+                    self.expect_token(Token::Eq)?;
+                    let mut value = self.parse_expr()?;
+
+                    if !params.is_empty() {
+                        value = params
+                            .into_iter()
+                            .rev()
+                            .fold(value, |acc, param| Expr::Lambda {
+                                param,
+                                body: Box::new(acc),
+                            });
+                    }
+                    bindings.push((name, value));
+
+                    if !self.match_token(&Token::AndKeyword) {
+                        break;
+                    }
+                }
+
+                // Now check for 'in'
+                if self.match_token(&Token::In) {
+                    let body = self.parse_expr()?;
+                    Ok(LetResult::Expr(Expr::LetRecMutual {
+                        bindings,
+                        body: Box::new(body),
+                    }))
+                } else {
+                    // It's a LetRec item.
+                    // Convert (name, val) pairs.
+                    // ModuleItem::LetRec takes a Vec.
+                    Ok(LetResult::Item(ModuleItem::LetRec(bindings)))
+                }
+            } else {
+                // Single recursive binding
+                // Expect 'in' - wait, for top-level item, 'in' is NOT expected.
+                // If 'in' is present, it is an expression.
+                if self.match_token(&Token::In) {
+                    let body = self.parse_expr()?;
+                    Ok(LetResult::Expr(Expr::LetRec {
+                        name: first_name,
+                        value: Box::new(first_value),
+                        body: Box::new(body),
+                    }))
+                } else {
+                    Ok(LetResult::Item(ModuleItem::LetRec(vec![(
+                        first_name,
+                        first_value,
+                    )])))
+                }
+            }
+        } else {
+            // Simple Let
+            let name = self.expect_ident()?;
+            let mut params = vec![];
+            while let Token::Ident(_) = &self.current_token().token {
+                params.push(self.expect_ident()?);
+            }
+
+            self.expect_token(Token::Eq)?;
+            let mut value = self.parse_expr()?;
+
+            if !params.is_empty() {
+                value = params
+                    .into_iter()
+                    .rev()
+                    .fold(value, |acc, param| Expr::Lambda {
+                        param,
+                        body: Box::new(acc),
+                    });
+            }
+
+            if self.match_token(&Token::In) {
+                let body = self.parse_expr()?;
+                Ok(LetResult::Expr(Expr::Let {
+                    name,
+                    value: Box::new(value),
+                    body: Box::new(body),
+                }))
+            } else {
+                Ok(LetResult::Item(ModuleItem::Let(name, value)))
+            }
         }
-
-        self.expect_token(Token::Eq)?;
-        let mut body = self.parse_expr()?;
-
-        // Wrap in nested lambdas for curried functions
-        for param in params.into_iter().rev() {
-            body = Expr::Lambda {
-                param,
-                body: Box::new(body),
-            };
-        }
-
-        Ok((name, body))
     }
 
     /// Parse an import statement: open Math or open Math.Geometry
@@ -795,6 +942,12 @@ impl Parser {
 
         // Repeatedly parse arguments while we see primary expressions
         while self.is_primary_start() {
+            // Heuristic: if the argument is at column 1 (start of line),
+            // treat it as a new statement/expression, not an argument.
+            if self.current_token().pos.column == 1 {
+                break;
+            }
+
             let arg = self.parse_postfix_expr()?;
             func = Expr::App {
                 func: Box::new(func),
@@ -1384,16 +1537,6 @@ impl Parser {
             return false;
         }
         &self.current_token().token == expected
-    }
-
-    /// Check if current token is an identifier
-    fn peek_is_identifier(&self) -> bool {
-        matches!(self.peek(), Some(Token::Ident(_)))
-    }
-
-    /// Check if current token matches a specific token
-    fn peek_is(&self, token: &Token) -> bool {
-        self.peek() == Some(token)
     }
 
     /// Expect a specific token, returning error if not found

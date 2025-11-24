@@ -239,14 +239,8 @@ impl Compiler {
             compiler.apply_import(import)?;
         }
 
-        // Phase 3: Compile main expression (if present)
-        if let Some(main_expr) = &program.main_expr {
-            compiler.compile_expr(main_expr)?;
-        } else {
-            // No main expression, just return Unit
-            let unit_idx = compiler.add_constant(Value::Unit)?;
-            compiler.emit(Instruction::LoadConst(unit_idx));
-        }
+        // Phase 3: Compile top-level items and main expression
+        compiler.compile_top_level_items(&program.items, &program.main_expr)?;
 
         compiler.emit(Instruction::Return);
         Ok(compiler.chunk)
@@ -607,6 +601,102 @@ impl Compiler {
         self.compile_expr(array)?;
         // Emit ArrayLength instruction
         self.emit(Instruction::ArrayLength);
+        Ok(())
+    }
+
+    fn compile_top_level_items(
+        &mut self,
+        items: &[ModuleItem],
+        main_expr: &Option<Expr>,
+    ) -> CompileResult<()> {
+        if let Some((first, rest)) = items.split_first() {
+            match first {
+                ModuleItem::Let(name, value) => {
+                    // Compile value
+                    self.compile_expr(value)?;
+
+                    // Enter scope
+                    self.begin_scope();
+                    self.add_local(name.to_string())?;
+
+                    // Store local
+                    let local_idx = (self.locals.len() - 1) as u8;
+                    self.emit(Instruction::StoreLocal(local_idx));
+
+                    // Recurse
+                    self.compile_top_level_items(rest, main_expr)?;
+
+                    // Clean up scope
+                    let locals_to_remove = self.end_scope_count();
+                    for _ in 0..locals_to_remove {
+                        self.locals.pop();
+                    }
+                    self.scope_depth -= 1;
+                }
+                ModuleItem::LetRec(bindings) => {
+                    if bindings.len() == 1 {
+                        // Single recursive binding
+                        let (name, value) = &bindings[0];
+                        let placeholder_idx = self.add_constant(Value::Unit)?;
+                        self.emit(Instruction::LoadConst(placeholder_idx));
+
+                        self.begin_scope();
+                        self.add_local(name.to_string())?;
+                        let local_idx = (self.locals.len() - 1) as u8;
+                        self.emit(Instruction::StoreLocal(local_idx));
+
+                        self.compile_expr(value)?;
+                        self.emit(Instruction::StoreLocal(local_idx));
+
+                        self.compile_top_level_items(rest, main_expr)?;
+
+                        let locals_to_remove = self.end_scope_count();
+                        for _ in 0..locals_to_remove {
+                            self.locals.pop();
+                        }
+                        self.scope_depth -= 1;
+                    } else {
+                        // Mutual recursion
+                        let placeholder_idx = self.add_constant(Value::Unit)?;
+                        let mut local_indices = Vec::new();
+
+                        self.begin_scope();
+
+                        for (name, _) in bindings {
+                            self.emit(Instruction::LoadConst(placeholder_idx));
+                            self.add_local(name.to_string())?;
+                            local_indices.push((self.locals.len() - 1) as u8);
+                            self.emit(Instruction::StoreLocal(*local_indices.last().unwrap()));
+                        }
+
+                        for ((_, value), local_idx) in bindings.iter().zip(local_indices.iter()) {
+                            self.compile_expr(value)?;
+                            self.emit(Instruction::StoreLocal(*local_idx));
+                        }
+
+                        self.compile_top_level_items(rest, main_expr)?;
+
+                        let locals_to_remove = self.end_scope_count();
+                        for _ in 0..locals_to_remove {
+                            self.locals.pop();
+                        }
+                        self.scope_depth -= 1;
+                    }
+                }
+                ModuleItem::TypeDef(_) | ModuleItem::Module(_) => {
+                    // Skip non-executable items and recurse
+                    self.compile_top_level_items(rest, main_expr)?;
+                }
+            }
+        } else {
+            // Base case: compile main expression
+            if let Some(expr) = main_expr {
+                self.compile_expr(expr)?;
+            } else {
+                let unit_idx = self.add_constant(Value::Unit)?;
+                self.emit(Instruction::LoadConst(unit_idx));
+            }
+        }
         Ok(())
     }
 

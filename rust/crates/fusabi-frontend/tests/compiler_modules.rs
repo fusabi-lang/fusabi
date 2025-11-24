@@ -30,6 +30,7 @@ fn test_compile_empty_program() {
     let program = Program {
         modules: vec![],
         imports: vec![],
+        items: vec![],
         main_expr: None,
     };
 
@@ -48,6 +49,7 @@ fn test_compile_program_with_simple_module_constant() {
     let program = Program {
         modules: vec![math_module],
         imports: vec![],
+        items: vec![],
         main_expr: Some(Expr::Lit(Literal::Int(42))),
     };
 
@@ -70,6 +72,7 @@ fn test_compile_program_with_import() {
     let program = Program {
         modules: vec![constants_module],
         imports: vec![make_import("Constants")],
+        items: vec![],
         main_expr: Some(Expr::Lit(Literal::Int(42))),
     };
 
@@ -88,6 +91,7 @@ fn test_compile_qualified_name() {
     let program = Program {
         modules: vec![math_module],
         imports: vec![],
+        items: vec![],
         main_expr: Some(Expr::Var("Math.value".to_string())),
     };
 
@@ -109,6 +113,7 @@ fn test_compile_imported_binding() {
     let program = Program {
         modules: vec![constants_module],
         imports: vec![make_import("Constants")],
+        items: vec![],
         main_expr: Some(Expr::Var("answer".to_string())),
     };
 
@@ -132,6 +137,7 @@ fn test_compile_multiple_modules() {
     let program = Program {
         modules: vec![math_module, physics_module],
         imports: vec![],
+        items: vec![],
         main_expr: Some(Expr::Lit(Literal::Int(42))),
     };
 
@@ -156,6 +162,7 @@ fn test_compile_multiple_imports() {
     let program = Program {
         modules: vec![math_module, physics_module],
         imports: vec![make_import("Math"), make_import("Physics")],
+        items: vec![],
         main_expr: Some(Expr::Lit(Literal::Int(42))),
     };
 
@@ -181,6 +188,7 @@ fn test_compile_module_with_multiple_bindings() {
     let program = Program {
         modules: vec![math_module],
         imports: vec![],
+        items: vec![],
         main_expr: Some(Expr::Lit(Literal::Int(42))),
     };
 
@@ -205,6 +213,7 @@ fn test_compile_nested_modules() {
     let program = Program {
         modules: vec![outer_module],
         imports: vec![],
+        items: vec![],
         main_expr: Some(Expr::Lit(Literal::Int(42))),
     };
 
@@ -230,6 +239,7 @@ fn test_compile_module_with_constant() {
     let program = Program {
         modules: vec![constants_module],
         imports: vec![],
+        items: vec![],
         main_expr: Some(Expr::Var("Constants.pi".to_string())),
     };
 
@@ -251,6 +261,7 @@ fn test_compile_program_using_imported_constant() {
     let program = Program {
         modules: vec![constants_module],
         imports: vec![make_import("Constants")],
+        items: vec![],
         main_expr: Some(Expr::Var("value".to_string())),
     };
 
@@ -265,6 +276,7 @@ fn test_compile_error_undefined_module() {
     let program = Program {
         modules: vec![],
         imports: vec![],
+        items: vec![],
         main_expr: Some(Expr::Var("NonExistent.func".to_string())),
     };
 
@@ -289,6 +301,7 @@ fn test_compile_error_undefined_binding_in_module() {
     let program = Program {
         modules: vec![math_module],
         imports: vec![],
+        items: vec![],
         main_expr: Some(Expr::Var("Math.nonexistent".to_string())),
     };
 
@@ -323,6 +336,7 @@ fn test_compile_module_with_expression() {
     let program = Program {
         modules: vec![math_module],
         imports: vec![],
+        items: vec![],
         main_expr: Some(Expr::Var("Math.sum".to_string())),
     };
 
@@ -343,6 +357,7 @@ fn test_compile_program_with_expression_using_module() {
     let program = Program {
         modules: vec![math_module],
         imports: vec![],
+        items: vec![],
         main_expr: Some(Expr::BinOp {
             op: BinOp::Add,
             left: Box::new(Expr::Var("Math.value".to_string())),
@@ -376,6 +391,7 @@ fn test_compile_imported_expression() {
     let program = Program {
         modules: vec![math_module],
         imports: vec![make_import("Math")],
+        items: vec![],
         main_expr: Some(Expr::Var("doubled".to_string())),
     };
 
@@ -395,6 +411,7 @@ fn test_compile_module_with_bool() {
     let program = Program {
         modules: vec![flags_module],
         imports: vec![],
+        items: vec![],
         main_expr: Some(Expr::Var("Flags.enabled".to_string())),
     };
 
@@ -420,6 +437,7 @@ fn test_compile_module_with_string() {
     let program = Program {
         modules: vec![messages_module],
         imports: vec![],
+        items: vec![],
         main_expr: Some(Expr::Var("Messages.greeting".to_string())),
     };
 

@@ -3,6 +3,7 @@
 
 use crate::chunk::Chunk;
 use crate::closure::{Closure, Upvalue};
+use crate::gc::GcHeap;
 use crate::host::HostRegistry;
 use crate::instruction::Instruction;
 use crate::value::Value;
@@ -127,6 +128,8 @@ pub struct Vm {
     pub globals: HashMap<String, Value>,
     /// Host function registry
     pub host_registry: Rc<RefCell<HostRegistry>>,
+    /// Garbage collector heap
+    pub gc_heap: GcHeap,
 }
 
 impl Vm {
@@ -137,7 +140,60 @@ impl Vm {
             frames: Vec::new(),
             globals: HashMap::new(),
             host_registry: Rc::new(RefCell::new(HostRegistry::new())),
+            gc_heap: GcHeap::new(),
         }
+    }
+
+    /// Create a new VM with a custom GC threshold
+    pub fn with_gc_threshold(threshold: usize) -> Self {
+        Vm {
+            stack: Vec::new(),
+            frames: Vec::new(),
+            globals: HashMap::new(),
+            host_registry: Rc::new(RefCell::new(HostRegistry::new())),
+            gc_heap: GcHeap::with_threshold(threshold),
+        }
+    }
+
+    /// Collect garbage - performs mark-and-sweep on unreachable objects
+    pub fn collect_garbage(&mut self) {
+        // Gather all roots: stack, globals, and upvalues from frames
+        let mut roots = Vec::new();
+
+        // Add stack values as roots
+        roots.extend(self.stack.iter().cloned());
+
+        // Add globals as roots
+        roots.extend(self.globals.values().cloned());
+
+        // Add closure constants and upvalues from frames as roots
+        for frame in &self.frames {
+            // Add the closure itself as a root
+            roots.push(Value::Closure(frame.closure.clone()));
+
+            // Add upvalues
+            for upvalue in &frame.closure.upvalues {
+                let upvalue = upvalue.borrow();
+                if let Upvalue::Closed(value) = &*upvalue {
+                    roots.push(value.clone());
+                }
+            }
+        }
+
+        // Perform collection
+        self.gc_heap.collect(&roots);
+    }
+
+    /// Check if GC should run and trigger collection if needed
+    pub fn maybe_collect_garbage(&mut self) {
+        if self.gc_heap.should_collect() {
+            self.collect_garbage();
+        }
+    }
+
+    /// Get GC statistics
+    pub fn gc_stats(&self) -> &crate::gc::GcStats {
+        &self.gc_heap.stats
     }
 
     /// Execute a chunk of bytecode
@@ -2297,5 +2353,59 @@ mod tests {
         );
         assert_eq!(result.variant_get_field(2), Ok(Value::Bool(true)));
         assert_eq!(format!("{}", result), "Data(42, hello, true)");
+    }
+
+    // ========== Garbage Collection Tests ==========
+
+    #[test]
+    fn test_gc_basic_allocation() {
+        let mut vm = Vm::new();
+        let initial_count = vm.gc_heap.object_count();
+
+        // Allocate some objects
+        vm.gc_heap.allocate(Value::Int(1));
+        vm.gc_heap.allocate(Value::Int(2));
+        vm.gc_heap.allocate(Value::Int(3));
+
+        assert_eq!(vm.gc_heap.object_count(), initial_count + 3);
+    }
+
+    #[test]
+    fn test_gc_collect_no_roots() {
+        let mut vm = Vm::new();
+
+        // Allocate objects without keeping them as roots
+        vm.gc_heap.allocate(Value::Int(1));
+        vm.gc_heap.allocate(Value::Int(2));
+        vm.gc_heap.allocate(Value::Int(3));
+
+        let count_before = vm.gc_heap.object_count();
+        assert_eq!(count_before, 3);
+
+        // Collect with empty stack/globals - all should be collected
+        vm.collect_garbage();
+
+        assert_eq!(vm.gc_heap.object_count(), 0);
+        assert_eq!(vm.gc_stats().collections, 1);
+        assert_eq!(vm.gc_stats().objects_collected, 3);
+    }
+
+    #[test]
+    fn test_gc_threshold_triggers() {
+        // Create VM with small threshold to trigger collection easily
+        let mut vm = Vm::with_gc_threshold(100);
+
+        // Allocate enough to exceed threshold
+        for i in 0..50 {
+            vm.gc_heap.allocate(Value::Int(i));
+        }
+
+        // Should have triggered collection check
+        assert!(vm.gc_heap.should_collect());
+
+        vm.maybe_collect_garbage();
+
+        // Collection should have occurred
+        assert!(vm.gc_stats().collections > 0);
     }
 }

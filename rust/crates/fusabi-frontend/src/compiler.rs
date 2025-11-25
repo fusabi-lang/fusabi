@@ -71,6 +71,10 @@ pub enum CompileError {
     ModuleNotFound(String),
     /// No module context available
     NoModuleContext,
+    /// Break statement used outside of loop
+    BreakOutsideLoop,
+    /// Continue statement used outside of loop
+    ContinueOutsideLoop,
 }
 
 impl fmt::Display for CompileError {
@@ -105,6 +109,12 @@ impl fmt::Display for CompileError {
             }
             CompileError::NoModuleContext => {
                 write!(f, "No module context available for qualified name lookup")
+            }
+            CompileError::BreakOutsideLoop => {
+                write!(f, "Break statement used outside of loop")
+            }
+            CompileError::ContinueOutsideLoop => {
+                write!(f, "Continue statement used outside of loop")
             }
         }
     }
@@ -146,6 +156,17 @@ struct Local {
     depth: usize,
 }
 
+/// Loop state for tracking break/continue targets
+#[derive(Debug, Clone)]
+struct LoopState {
+    /// Offset of the loop start (for continue)
+    start_offset: usize,
+    /// Offsets of break jumps to be patched to loop end
+    break_jumps: Vec<usize>,
+    /// Offsets of continue jumps to be patched to loop start
+    continue_jumps: Vec<usize>,
+}
+
 /// Bytecode compiler state
 pub struct Compiler {
     chunk: Chunk,
@@ -157,6 +178,9 @@ pub struct Compiler {
     // Module support
     module_registry: Option<ModuleRegistry>,
     imported_bindings: HashMap<String, Expr>,
+
+    // Loop support
+    loop_stack: Vec<LoopState>,
 }
 
 impl Compiler {
@@ -170,6 +194,7 @@ impl Compiler {
             type_env: None,
             module_registry: None,
             imported_bindings: HashMap::new(),
+            loop_stack: Vec::new(),
         }
     }
 
@@ -183,6 +208,7 @@ impl Compiler {
             type_env: None,
             module_registry: None,
             imported_bindings: HashMap::new(),
+            loop_stack: Vec::new(),
         }
     }
 
@@ -394,6 +420,20 @@ impl Compiler {
                 variant,
                 fields,
             } => self.compile_variant_construct(type_name, variant, fields),
+            Expr::MethodCall {
+                receiver,
+                method_name,
+                args,
+            } => self.compile_method_call(receiver, method_name, args),
+            Expr::While { .. } => Err(CompileError::CodeGenError(
+                "While loops not yet supported in compiler".to_string(),
+            )),
+            Expr::Break => Err(CompileError::CodeGenError(
+                "Break not yet supported in compiler".to_string(),
+            )),
+            Expr::Continue => Err(CompileError::CodeGenError(
+                "Continue not yet supported in compiler".to_string(),
+            )),
         }
     }
 
@@ -1256,6 +1296,39 @@ impl Compiler {
         // Emit UpdateRecord instruction with update count
         let update_count = fields.len() as u16;
         self.emit(Instruction::UpdateRecord(update_count));
+
+        Ok(())
+    }
+
+    /// Compile a method call expression
+    /// Stack effect: pushes the result of the method call
+    fn compile_method_call(
+        &mut self,
+        receiver: &Expr,
+        method_name: &str,
+        args: &[Expr],
+    ) -> CompileResult<()> {
+        // Check if arg count fits in u8
+        if args.len() > u8::MAX as usize {
+            return Err(CompileError::CodeGenError(
+                "Too many method arguments (max 255)".to_string(),
+            ));
+        }
+
+        // Compile receiver expression
+        self.compile_expr(receiver)?;
+
+        // Compile argument expressions
+        for arg in args {
+            self.compile_expr(arg)?;
+        }
+
+        // Store method name in constants pool
+        let method_name_idx = self.add_constant(Value::Str(method_name.to_string()))?;
+
+        // Emit CallMethod instruction
+        let arg_count = args.len() as u8;
+        self.emit(Instruction::CallMethod(method_name_idx, arg_count));
 
         Ok(())
     }

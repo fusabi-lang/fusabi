@@ -265,6 +265,12 @@ fn mark_value(value: &Value, tracer: &mut Tracer, objects: &HashMap<usize, GcObj
                 mark_value(value, tracer, objects);
             }
         }
+        Value::Map(map) => {
+            let map = map.borrow();
+            for value in map.values() {
+                mark_value(value, tracer, objects);
+            }
+        }
         Value::Variant { fields, .. } => {
             for field in fields {
                 mark_value(field, tracer, objects);
@@ -327,6 +333,14 @@ fn estimate_value_size(value: &Value) -> usize {
             let fields = fields.borrow();
             std::mem::size_of::<HashMap<String, Value>>()
                 + fields
+                    .iter()
+                    .map(|(k, v)| k.len() + estimate_value_size(v))
+                    .sum::<usize>()
+        }
+        Value::Map(map) => {
+            let map = map.borrow();
+            std::mem::size_of::<HashMap<String, Value>>()
+                + map
                     .iter()
                     .map(|(k, v)| k.len() + estimate_value_size(v))
                     .sum::<usize>()

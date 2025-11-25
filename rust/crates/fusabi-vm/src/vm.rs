@@ -335,30 +335,77 @@ impl Vm {
 
                 // Arithmetic operations
                 Instruction::Add => {
-                    let b = self.pop_int()?;
-                    let a = self.pop_int()?;
-                    self.push(Value::Int(a + b));
+                    let b = self.pop()?;
+                    let a = self.pop()?;
+                    match (a, b) {
+                        (Value::Int(a), Value::Int(b)) => self.push(Value::Int(a + b)),
+                        (Value::Float(a), Value::Float(b)) => self.push(Value::Float(a + b)),
+                        (a, b) => {
+                            return Err(VmError::Runtime(format!(
+                                "Type mismatch in addition: {} + {}",
+                                a.type_name(),
+                                b.type_name()
+                            )))
+                        }
+                    }
                 }
 
                 Instruction::Sub => {
-                    let b = self.pop_int()?;
-                    let a = self.pop_int()?;
-                    self.push(Value::Int(a - b));
+                    let b = self.pop()?;
+                    let a = self.pop()?;
+                    match (a, b) {
+                        (Value::Int(a), Value::Int(b)) => self.push(Value::Int(a - b)),
+                        (Value::Float(a), Value::Float(b)) => self.push(Value::Float(a - b)),
+                        (a, b) => {
+                            return Err(VmError::Runtime(format!(
+                                "Type mismatch in subtraction: {} - {}",
+                                a.type_name(),
+                                b.type_name()
+                            )))
+                        }
+                    }
                 }
 
                 Instruction::Mul => {
-                    let b = self.pop_int()?;
-                    let a = self.pop_int()?;
-                    self.push(Value::Int(a * b));
+                    let b = self.pop()?;
+                    let a = self.pop()?;
+                    match (a, b) {
+                        (Value::Int(a), Value::Int(b)) => self.push(Value::Int(a * b)),
+                        (Value::Float(a), Value::Float(b)) => self.push(Value::Float(a * b)),
+                        (a, b) => {
+                            return Err(VmError::Runtime(format!(
+                                "Type mismatch in multiplication: {} * {}",
+                                a.type_name(),
+                                b.type_name()
+                            )))
+                        }
+                    }
                 }
 
                 Instruction::Div => {
-                    let b = self.pop_int()?;
-                    let a = self.pop_int()?;
-                    if b == 0 {
-                        return Err(VmError::DivisionByZero);
+                    let b = self.pop()?;
+                    let a = self.pop()?;
+                    match (a, b) {
+                        (Value::Int(a), Value::Int(b)) => {
+                            if b == 0 {
+                                return Err(VmError::DivisionByZero);
+                            }
+                            self.push(Value::Int(a / b))
+                        }
+                        (Value::Float(a), Value::Float(b)) => {
+                            if b == 0.0 {
+                                return Err(VmError::DivisionByZero);
+                            }
+                            self.push(Value::Float(a / b))
+                        }
+                        (a, b) => {
+                            return Err(VmError::Runtime(format!(
+                                "Type mismatch in division: {} / {}",
+                                a.type_name(),
+                                b.type_name()
+                            )))
+                        }
                     }
-                    self.push(Value::Int(a / b));
                 }
 
                 // Comparison operations
@@ -375,27 +422,67 @@ impl Vm {
                 }
 
                 Instruction::Lt => {
-                    let b = self.pop_int()?;
-                    let a = self.pop_int()?;
-                    self.push(Value::Bool(a < b));
+                    let b = self.pop()?;
+                    let a = self.pop()?;
+                    match (a, b) {
+                        (Value::Int(a), Value::Int(b)) => self.push(Value::Bool(a < b)),
+                        (Value::Float(a), Value::Float(b)) => self.push(Value::Bool(a < b)),
+                        (a, b) => {
+                            return Err(VmError::Runtime(format!(
+                                "Type mismatch in comparison: {} < {}",
+                                a.type_name(),
+                                b.type_name()
+                            )))
+                        }
+                    }
                 }
 
                 Instruction::Lte => {
-                    let b = self.pop_int()?;
-                    let a = self.pop_int()?;
-                    self.push(Value::Bool(a <= b));
+                    let b = self.pop()?;
+                    let a = self.pop()?;
+                    match (a, b) {
+                        (Value::Int(a), Value::Int(b)) => self.push(Value::Bool(a <= b)),
+                        (Value::Float(a), Value::Float(b)) => self.push(Value::Bool(a <= b)),
+                        (a, b) => {
+                            return Err(VmError::Runtime(format!(
+                                "Type mismatch in comparison: {} <= {}",
+                                a.type_name(),
+                                b.type_name()
+                            )))
+                        }
+                    }
                 }
 
                 Instruction::Gt => {
-                    let b = self.pop_int()?;
-                    let a = self.pop_int()?;
-                    self.push(Value::Bool(a > b));
+                    let b = self.pop()?;
+                    let a = self.pop()?;
+                    match (a, b) {
+                        (Value::Int(a), Value::Int(b)) => self.push(Value::Bool(a > b)),
+                        (Value::Float(a), Value::Float(b)) => self.push(Value::Bool(a > b)),
+                        (a, b) => {
+                            return Err(VmError::Runtime(format!(
+                                "Type mismatch in comparison: {} > {}",
+                                a.type_name(),
+                                b.type_name()
+                            )))
+                        }
+                    }
                 }
 
                 Instruction::Gte => {
-                    let b = self.pop_int()?;
-                    let a = self.pop_int()?;
-                    self.push(Value::Bool(a >= b));
+                    let b = self.pop()?;
+                    let a = self.pop()?;
+                    match (a, b) {
+                        (Value::Int(a), Value::Int(b)) => self.push(Value::Bool(a >= b)),
+                        (Value::Float(a), Value::Float(b)) => self.push(Value::Bool(a >= b)),
+                        (a, b) => {
+                            return Err(VmError::Runtime(format!(
+                                "Type mismatch in comparison: {} >= {}",
+                                a.type_name(),
+                                b.type_name()
+                            )))
+                        }
+                    }
                 }
 
                 // Logical operations
@@ -611,11 +698,18 @@ impl Vm {
                             // Pop the receiver from stack
                             self.pop()?;
 
-                            // Call the method via registry
-                            let result = {
+                            // Get the method function from registry
+                            let method_fn = {
                                 let registry = self.host_registry.borrow();
-                                registry.call_method(type_id, &method_name, self, &args)?
+                                registry
+                                    .get_method(type_id, &method_name)
+                                    .ok_or_else(|| {
+                                        VmError::Runtime(format!("Method not found: {}", method_name))
+                                    })?
                             };
+
+                            // Now call the method with mutable VM reference
+                            let result = method_fn(self, &args)?;
 
                             self.push(result);
                         }

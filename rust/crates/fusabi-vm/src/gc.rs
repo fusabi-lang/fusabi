@@ -279,7 +279,7 @@ fn mark_value(value: &Value, tracer: &mut Tracer, objects: &HashMap<usize, GcObj
             }
         }
         // Primitive types don't need tracing
-        Value::Int(_) | Value::Bool(_) | Value::Str(_) | Value::Unit | Value::Nil => {}
+        Value::Int(_) | Value::Float(_) | Value::Bool(_) | Value::Str(_) | Value::Unit | Value::Nil => {}
         // HostData is managed by Rust's reference counting
         Value::HostData(_) => {}
     }
@@ -308,6 +308,7 @@ fn mark_closure(closure: &Closure, tracer: &mut Tracer, objects: &HashMap<usize,
 fn estimate_value_size(value: &Value) -> usize {
     match value {
         Value::Int(_) => 8,
+        Value::Float(_) => 8,
         Value::Bool(_) => 1,
         Value::Str(s) => std::mem::size_of::<String>() + s.len(),
         Value::Unit => 0,

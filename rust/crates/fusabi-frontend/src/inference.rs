@@ -175,6 +175,44 @@ impl TypeInference {
 
             // Pattern matching: match scrutinee with | pat1 -> e1 | pat2 -> e2
             Expr::Match { scrutinee, arms } => self.infer_match(scrutinee, arms, env),
+
+            // Method call: obj.method(args...)
+            Expr::MethodCall {
+                receiver,
+                method_name: _,
+                args: _,
+            } => {
+                // For now, we infer method calls conservatively
+                // Type check the receiver
+                self.infer(receiver, env)?;
+                // Return a fresh type variable since we don't know the method's return type
+                Ok(Type::Var(self.fresh_var()))
+            }
+
+            // While loop: while cond do body
+            Expr::While { cond, body } => {
+                // Condition must be bool
+                let cond_ty = self.infer(cond, env)?;
+                self.unify(&cond_ty, &Type::Bool)?;
+                // Type check the body
+                self.infer(body, env)?;
+                // While loops return unit
+                Ok(Type::Unit)
+            }
+
+            // Break statement
+            Expr::Break => {
+                // Break has unit type but can only appear in loops
+                // We'll let the compiler handle loop context validation
+                Ok(Type::Unit)
+            }
+
+            // Continue statement
+            Expr::Continue => {
+                // Continue has unit type but can only appear in loops
+                // We'll let the compiler handle loop context validation
+                Ok(Type::Unit)
+            }
         }
     }
 

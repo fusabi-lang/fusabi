@@ -438,7 +438,7 @@ impl Compiler {
             Literal::Bool(b) => Value::Bool(*b),
             Literal::Str(s) => Value::Str(s.clone()),
             Literal::Unit => Value::Unit,
-            Literal::Float(_) => return Err(CompileError::UnsupportedFloat),
+            Literal::Float(f) => Value::Float(*f),
         };
 
         let idx = self.add_constant(value)?;
@@ -1145,7 +1145,13 @@ impl Compiler {
                 self.emit(Instruction::Eq);
                 Ok(())
             }
-            Pattern::Literal(Literal::Float(_)) => Err(CompileError::UnsupportedFloat),
+            Pattern::Literal(Literal::Float(f)) => {
+                // Check if value equals the float
+                let float_idx = self.add_constant(Value::Float(*f))?;
+                self.emit(Instruction::LoadConst(float_idx));
+                self.emit(Instruction::Eq);
+                Ok(())
+            }
             Pattern::Tuple(patterns) => {
                 // Check tuple length first
                 self.emit(Instruction::Dup);

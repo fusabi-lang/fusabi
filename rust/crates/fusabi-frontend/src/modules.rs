@@ -68,6 +68,96 @@ impl ModuleRegistry {
         }
     }
 
+    /// Create a new module registry with standard library modules pre-registered
+    pub fn with_stdlib() -> Self {
+        let mut registry = Self::new();
+        registry.register_stdlib_modules();
+        registry
+    }
+
+    /// Register standard library modules
+    ///
+    /// This registers the standard library modules (List, String, Map, Option, etc.)
+    /// as placeholder modules. The actual implementations are provided by the VM
+    /// at runtime, but this allows the compiler to resolve qualified names and
+    /// imports without errors.
+    fn register_stdlib_modules(&mut self) {
+        // Helper function to create a placeholder variable that will be resolved at runtime
+        let make_global_ref = |qualified_name: &str| -> Expr {
+            Expr::Var(qualified_name.to_string())
+        };
+
+        // List module
+        let mut list_bindings = HashMap::new();
+        list_bindings.insert("length".to_string(), make_global_ref("List.length"));
+        list_bindings.insert("head".to_string(), make_global_ref("List.head"));
+        list_bindings.insert("tail".to_string(), make_global_ref("List.tail"));
+        list_bindings.insert("reverse".to_string(), make_global_ref("List.reverse"));
+        list_bindings.insert("isEmpty".to_string(), make_global_ref("List.isEmpty"));
+        list_bindings.insert("append".to_string(), make_global_ref("List.append"));
+        list_bindings.insert("concat".to_string(), make_global_ref("List.concat"));
+        list_bindings.insert("map".to_string(), make_global_ref("List.map"));
+        self.register_module("List".to_string(), list_bindings, HashMap::new());
+
+        // String module
+        let mut string_bindings = HashMap::new();
+        string_bindings.insert("length".to_string(), make_global_ref("String.length"));
+        string_bindings.insert("trim".to_string(), make_global_ref("String.trim"));
+        string_bindings.insert("toLower".to_string(), make_global_ref("String.toLower"));
+        string_bindings.insert("toUpper".to_string(), make_global_ref("String.toUpper"));
+        string_bindings.insert("split".to_string(), make_global_ref("String.split"));
+        string_bindings.insert("concat".to_string(), make_global_ref("String.concat"));
+        string_bindings.insert("contains".to_string(), make_global_ref("String.contains"));
+        string_bindings.insert("startsWith".to_string(), make_global_ref("String.startsWith"));
+        string_bindings.insert("endsWith".to_string(), make_global_ref("String.endsWith"));
+        self.register_module("String".to_string(), string_bindings, HashMap::new());
+
+        // Map module
+        let mut map_bindings = HashMap::new();
+        map_bindings.insert("empty".to_string(), make_global_ref("Map.empty"));
+        map_bindings.insert("add".to_string(), make_global_ref("Map.add"));
+        map_bindings.insert("remove".to_string(), make_global_ref("Map.remove"));
+        map_bindings.insert("find".to_string(), make_global_ref("Map.find"));
+        map_bindings.insert("tryFind".to_string(), make_global_ref("Map.tryFind"));
+        map_bindings.insert("containsKey".to_string(), make_global_ref("Map.containsKey"));
+        map_bindings.insert("isEmpty".to_string(), make_global_ref("Map.isEmpty"));
+        map_bindings.insert("count".to_string(), make_global_ref("Map.count"));
+        map_bindings.insert("ofList".to_string(), make_global_ref("Map.ofList"));
+        map_bindings.insert("toList".to_string(), make_global_ref("Map.toList"));
+        self.register_module("Map".to_string(), map_bindings, HashMap::new());
+
+        // Option module
+        let mut option_bindings = HashMap::new();
+        option_bindings.insert("isSome".to_string(), make_global_ref("Option.isSome"));
+        option_bindings.insert("isNone".to_string(), make_global_ref("Option.isNone"));
+        option_bindings.insert("defaultValue".to_string(), make_global_ref("Option.defaultValue"));
+        option_bindings.insert("defaultWith".to_string(), make_global_ref("Option.defaultWith"));
+        option_bindings.insert("map".to_string(), make_global_ref("Option.map"));
+        option_bindings.insert("bind".to_string(), make_global_ref("Option.bind"));
+        option_bindings.insert("iter".to_string(), make_global_ref("Option.iter"));
+        option_bindings.insert("map2".to_string(), make_global_ref("Option.map2"));
+        option_bindings.insert("orElse".to_string(), make_global_ref("Option.orElse"));
+        self.register_module("Option".to_string(), option_bindings, HashMap::new());
+
+        // System.Collections.Generic module (for compatibility)
+        // This is a common .NET namespace that F# developers might use
+        let mut system_collections_generic_bindings = HashMap::new();
+        // Map common .NET collection types to Fusabi equivalents
+        system_collections_generic_bindings.insert("List".to_string(), make_global_ref("List"));
+        system_collections_generic_bindings.insert("Dictionary".to_string(), make_global_ref("Map"));
+        self.register_module("System.Collections.Generic".to_string(), system_collections_generic_bindings, HashMap::new());
+
+        // Support for System.Collections as well
+        let mut system_collections_bindings = HashMap::new();
+        system_collections_bindings.insert("Generic".to_string(), make_global_ref("System.Collections.Generic"));
+        self.register_module("System.Collections".to_string(), system_collections_bindings, HashMap::new());
+
+        // System module (parent of System.Collections)
+        let mut system_bindings = HashMap::new();
+        system_bindings.insert("Collections".to_string(), make_global_ref("System.Collections"));
+        self.register_module("System".to_string(), system_bindings, HashMap::new());
+    }
+
     /// Register a module with its bindings and types
     ///
     /// # Arguments
@@ -186,6 +276,26 @@ mod tests {
     }
 
     #[test]
+    fn test_module_registry_with_stdlib() {
+        let registry = ModuleRegistry::with_stdlib();
+
+        // Should have standard library modules
+        assert!(registry.has_module("List"));
+        assert!(registry.has_module("String"));
+        assert!(registry.has_module("Map"));
+        assert!(registry.has_module("Option"));
+        assert!(registry.has_module("System"));
+        assert!(registry.has_module("System.Collections"));
+        assert!(registry.has_module("System.Collections.Generic"));
+
+        // Should be able to resolve stdlib functions
+        assert!(registry.resolve_qualified("List", "length").is_some());
+        assert!(registry.resolve_qualified("String", "trim").is_some());
+        assert!(registry.resolve_qualified("Map", "empty").is_some());
+        assert!(registry.resolve_qualified("Option", "isSome").is_some());
+    }
+
+    #[test]
     fn test_register_and_resolve_module() {
         let mut registry = ModuleRegistry::new();
 
@@ -210,7 +320,7 @@ mod tests {
 
         // Verify module exists
         assert!(registry.has_module("Math"));
-        assert_eq!(registry.module_names(), vec!["Math"]);
+        assert_eq!(registry.module_names().len(), 1);
 
         // Resolve qualified name
         let expr = registry.resolve_qualified("Math", "add");

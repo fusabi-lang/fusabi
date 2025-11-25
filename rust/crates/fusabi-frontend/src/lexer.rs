@@ -9,6 +9,7 @@
 //! - Operators: arithmetic, comparison, logical, cons (::)
 //! - Punctuation: parentheses, arrows, commas, brackets, semicolons
 //! - Array syntax: [|, |], <-, .
+//! - Anonymous record syntax: {|, |}
 //! - Position tracking for error reporting
 //!
 //! # Example
@@ -139,6 +140,10 @@ pub enum Token {
     LBrace,
     /// } right brace
     RBrace,
+    /// {| left anonymous record brace
+    LBracePipe,
+    /// |} right anonymous record brace
+    PipeRBrace,
     /// : colon
     Colon,
     /// | pipe
@@ -198,6 +203,8 @@ impl fmt::Display for Token {
             Token::Dot => write!(f, "."),
             Token::LBrace => write!(f, "{{"),
             Token::RBrace => write!(f, "}}"),
+            Token::LBracePipe => write!(f, "{{|"),
+            Token::PipeRBrace => write!(f, "|}}"),
             Token::Colon => write!(f, ":"),
             Token::Pipe => write!(f, "|"),
             Token::Underscore => write!(f, "_"),
@@ -389,6 +396,9 @@ impl Lexer {
                 } else if !self.is_at_end() && self.current_char() == ']' {
                     self.advance();
                     Ok(Token::PipeRBracket)
+                } else if !self.is_at_end() && self.current_char() == '}' {
+                    self.advance();
+                    Ok(Token::PipeRBrace)
                 } else {
                     Ok(Token::Pipe)
                 }
@@ -415,10 +425,7 @@ impl Lexer {
                 self.advance();
                 Ok(Token::Semicolon)
             }
-            '{' => {
-                self.advance();
-                Ok(Token::LBrace)
-            }
+            '{' => self.lex_lbrace_or_lbrace_pipe(),
             '}' => {
                 self.advance();
                 Ok(Token::RBrace)
@@ -631,6 +638,17 @@ impl Lexer {
         }
     }
 
+    /// Lex { or {|.
+    fn lex_lbrace_or_lbrace_pipe(&mut self) -> Result<Token, LexError> {
+        self.advance();
+        if !self.is_at_end() && self.current_char() == '|' {
+            self.advance();
+            Ok(Token::LBracePipe)
+        } else {
+            Ok(Token::LBrace)
+        }
+    }
+
     /// Skip whitespace and comments.
     fn skip_whitespace_and_comments(&mut self) {
         loop {
@@ -721,5 +739,22 @@ mod tests {
         assert_eq!(tokens.len(), 5); // let, x, =, 42, EOF
         assert_eq!(tokens[0].token, Token::Let);
         assert!(tokens[0].span.is_single_line());
+    }
+
+    #[test]
+    fn test_lex_anonymous_record_tokens() {
+        let mut lexer = Lexer::new("{| x = 1 |}");
+        let tokens = lexer.tokenize().unwrap();
+        assert_eq!(tokens[0].token, Token::LBracePipe);
+        assert_eq!(tokens[4].token, Token::PipeRBrace);
+    }
+
+    #[test]
+    fn test_lex_pipe_disambiguation() {
+        // Test that |} is recognized as PipeRBrace, not Pipe + RBrace
+        let mut lexer = Lexer::new("|}");
+        let tokens = lexer.tokenize().unwrap();
+        assert_eq!(tokens.len(), 2); // |} and EOF
+        assert_eq!(tokens[0].token, Token::PipeRBrace);
     }
 }

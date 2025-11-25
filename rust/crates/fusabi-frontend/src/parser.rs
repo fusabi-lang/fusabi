@@ -15,7 +15,7 @@
 //! - Lists: `[1; 2; 3]`, `[]`
 //! - Arrays: `[|1; 2; 3|]`, `arr.[0]`, `arr.[0] <- 99`
 //! - Records: `type Person = { name: string }`, `{ name = "John" }`, `person.name`, `{ person with age = 31 }`
-//! - Discriminated Unions: `type Option = Some of int | None`, `Some(42)`, `None`
+//! - Discriminated Unions: `type Option = Some of int | None`, `Some(42)`, `None`, `Some 42`
 //! - Cons operator: `1 :: [2; 3]`, `x :: xs`
 //! - Unary minus: `-42`, `-x`
 //! - Modules: `module Math = ...`, `open Math`
@@ -56,7 +56,7 @@
 //! array      ::= "[|" "]" | "[|" expr (";" expr)* ";"? "|]"
 //! record_literal ::= "{" (IDENT "=" expr (";" IDENT "=" expr)* ";"?)? "}"
 //! record_update  ::= "{" expr "with" IDENT "=" expr (";" IDENT "=" expr)* ";"? "}"
-//! variant_construct ::= IDENT ("(" expr ("," expr)* ")")?
+//! variant_construct ::= IDENT ("(" expr ("," expr)* ")")? | IDENT expr
 //! ```
 //!
 //! # Example
@@ -498,39 +498,32 @@ impl Parser {
             return self.parse_let_rec();
         }
 
-        // Parse variable name
         let name = self.expect_ident()?;
 
-        // Parse optional parameters (for function definitions)
+        // Parse optional parameter list (for multi-parameter functions)
+        // Example: let f x y = ...
         let mut params = vec![];
         while let Token::Ident(_) = &self.current_token().token {
             params.push(self.expect_ident()?);
         }
 
-        // Expect '='
         self.expect_token(Token::Eq)?;
+        let mut value = self.parse_expr()?;
 
-        // Parse value expression
-        let value = self.parse_expr()?;
-
-        // Expect 'in'
-        self.expect_token(Token::In)?;
-
-        // Parse body expression
-        let body = self.parse_expr()?;
-
-        // Convert multi-parameter function to nested lambdas
-        let value = if params.is_empty() {
-            value
-        } else {
-            params
+        // If we have params, desugar into nested lambdas
+        // let f x y = body  =>  let f = fun x -> fun y -> body
+        if !params.is_empty() {
+            value = params
                 .into_iter()
                 .rev()
                 .fold(value, |acc, param| Expr::Lambda {
                     param,
                     body: Box::new(acc),
-                })
-        };
+                });
+        }
+
+        self.expect_token(Token::In)?;
+        let body = self.parse_expr()?;
 
         Ok(Expr::Let {
             name,
@@ -539,81 +532,61 @@ impl Parser {
         })
     }
 
-    /// Parse recursive let-binding: let rec f = expr in body
+    /// Parse recursive let-binding: let rec f x = ... in body
     fn parse_let_rec(&mut self) -> Result<Expr> {
-        // Parse first binding name
+        // Expect function name
         let first_name = self.expect_ident()?;
 
-        // Parse optional parameters
+        // Parse parameters
         let mut params = vec![];
         while let Token::Ident(_) = &self.current_token().token {
             params.push(self.expect_ident()?);
         }
 
-        // Expect '='
         self.expect_token(Token::Eq)?;
+        let mut first_value = self.parse_expr()?;
 
-        // Parse value expression
-        let first_value = self.parse_expr()?;
-
-        // Convert multi-parameter function to nested lambdas
-        let first_value = if params.is_empty() {
-            first_value
-        } else {
-            params
+        // Desugar params into nested lambdas
+        if !params.is_empty() {
+            first_value = params
                 .into_iter()
                 .rev()
                 .fold(first_value, |acc, param| Expr::Lambda {
                     param,
                     body: Box::new(acc),
-                })
-        };
+                });
+        }
 
-        // Check for 'and' keyword (mutually recursive bindings)
+        // Check for mutual recursion ('and')
         if self.match_token(&Token::AndKeyword) {
             let mut bindings = vec![(first_name, first_value)];
 
-            // Parse additional bindings
             loop {
                 let name = self.expect_ident()?;
-
-                // Parse optional parameters
                 let mut params = vec![];
                 while let Token::Ident(_) = &self.current_token().token {
                     params.push(self.expect_ident()?);
                 }
-
-                // Expect '='
                 self.expect_token(Token::Eq)?;
+                let mut value = self.parse_expr()?;
 
-                // Parse value expression
-                let value = self.parse_expr()?;
-
-                // Convert multi-parameter function to nested lambdas
-                let value = if params.is_empty() {
-                    value
-                } else {
-                    params
+                if !params.is_empty() {
+                    value = params
                         .into_iter()
                         .rev()
                         .fold(value, |acc, param| Expr::Lambda {
                             param,
                             body: Box::new(acc),
-                        })
-                };
-
+                        });
+                }
                 bindings.push((name, value));
 
-                // Check for another 'and'
                 if !self.match_token(&Token::AndKeyword) {
                     break;
                 }
             }
 
-            // Expect 'in'
             self.expect_token(Token::In)?;
-
-            // Parse body
             let body = self.parse_expr()?;
 
             Ok(Expr::LetRecMutual {
@@ -621,11 +594,8 @@ impl Parser {
                 body: Box::new(body),
             })
         } else {
-            // Single recursive binding
-            // Expect 'in'
+            // Single recursive function
             self.expect_token(Token::In)?;
-
-            // Parse body
             let body = self.parse_expr()?;
 
             Ok(Expr::LetRec {
@@ -636,7 +606,7 @@ impl Parser {
         }
     }
 
-    /// Parse if-then-else expression
+    /// Parse conditional: if cond then expr1 else expr2
     fn parse_if(&mut self) -> Result<Expr> {
         self.expect_token(Token::If)?;
 
@@ -655,169 +625,135 @@ impl Parser {
         })
     }
 
-    /// Parse while loop: while <expr> do <expr>
-    fn parse_while(&mut self) -> Result<Expr> {
-        self.expect_token(Token::While)?;
-
-        // Parse condition
-        let cond = self.parse_expr()?;
-
-        // Expect 'do' keyword
-        self.expect_token(Token::Do)?;
-
-        // Parse body
-        let body = self.parse_expr()?;
-
-        Ok(Expr::While {
-            cond: Box::new(cond),
-            body: Box::new(body),
-        })
-    }
-
-    /// Parse lambda expression: fun x -> body or fun x y z -> body
-    /// Multi-parameter lambdas are desugared to nested single-parameter lambdas
+    /// Parse lambda function: fun x -> body or fun x y -> body
     fn parse_lambda(&mut self) -> Result<Expr> {
         self.expect_token(Token::Fun)?;
 
-        // Parse one or more parameters
+        // Parse parameter list
         let mut params = vec![];
-        params.push(self.expect_ident()?);
+        while let Token::Ident(_) = &self.current_token().token {
+            params.push(self.expect_ident()?);
+        }
 
-        // Continue parsing parameters until we hit the arrow
-        while !matches!(self.current_token().token, Token::Arrow) {
-            // Only parse identifiers as parameters
-            if let Token::Ident(_) = &self.current_token().token {
-                params.push(self.expect_ident()?);
-            } else {
-                break;
-            }
+        if params.is_empty() {
+            let tok = self.current_token();
+            return Err(ParseError::UnexpectedToken {
+                expected: "parameter".to_string(),
+                found: tok.token.clone(),
+                pos: tok.pos,
+            });
         }
 
         self.expect_token(Token::Arrow)?;
-        let mut body = self.parse_expr()?;
+        let body = self.parse_expr()?;
 
-        // Build nested lambdas from right to left: fun x y -> body becomes fun x -> (fun y -> body)
-        for param in params.into_iter().rev() {
-            body = Expr::Lambda {
+        // Desugar multi-param lambda into nested lambdas
+        // fun x y -> body  =>  fun x -> fun y -> body
+        Ok(params
+            .into_iter()
+            .rev()
+            .fold(body, |acc, param| Expr::Lambda {
                 param,
-                body: Box::new(body),
-            };
-        }
-
-        Ok(body)
+                body: Box::new(acc),
+            }))
     }
 
-    /// Parse match expression: match expr with | pat -> expr | ...
+    /// Parse match expression: match expr with | pattern -> expr
     fn parse_match(&mut self) -> Result<Expr> {
         self.expect_token(Token::Match)?;
 
-        // Parse scrutinee
         let scrutinee = Box::new(self.parse_expr()?);
 
-        // Expect 'with'
         self.expect_token(Token::With)?;
 
-        // Parse arms (at least one required)
         let mut arms = vec![];
 
-        // First arm must start with |
-        self.expect_token(Token::Pipe)?;
-
+        // Parse match arms
         loop {
-            // Parse pattern
+            // Optional leading pipe
+            self.match_token(&Token::Pipe);
+
             let pattern = self.parse_pattern()?;
 
-            // Expect ->
             self.expect_token(Token::Arrow)?;
 
-            // Parse body
             let body = Box::new(self.parse_expr()?);
 
             arms.push(MatchArm { pattern, body });
 
-            // Check for another arm (starts with |)
-            if !self.match_token(&Token::Pipe) {
+            // Check if there's another arm (starts with |)
+            if !self.check(&Token::Pipe) {
                 break;
             }
-        }
-
-        if arms.is_empty() {
-            let tok = self.current_token();
-            return Err(ParseError::InvalidExpr {
-                message: "match expression must have at least one arm".to_string(),
-                pos: tok.pos,
-            });
         }
 
         Ok(Expr::Match { scrutinee, arms })
     }
 
-    /// Parse pipeline expression: expr |> func
-    /// Desugars to func(expr)
-    fn parse_pipeline_expr(&mut self) -> Result<Expr> {
-        let mut expr = self.parse_or_expr()?;
+    /// Parse while loop: while cond do body
+    fn parse_while(&mut self) -> Result<Expr> {
+        self.expect_token(Token::While)?;
 
-        while self.match_token(&Token::PipeRight) {
-            let func_expr = self.parse_app_expr()?; // The function to pipe into
+        let cond = Box::new(self.parse_expr()?);
 
-            // Desugar: expr |> func_expr  =>  func_expr expr
-            expr = Expr::App {
-                func: Box::new(func_expr),
-                arg: Box::new(expr),
-            };
-        }
-        Ok(expr)
+        self.expect_token(Token::Do)?;
+
+        let body = Box::new(self.parse_expr()?);
+
+        Ok(Expr::While { cond, body })
     }
 
-    /// Parse pattern in match expression
+    /// Parse a pattern for match expressions
     fn parse_pattern(&mut self) -> Result<Pattern> {
         let tok = self.current_token();
 
         match &tok.token {
-            // Wildcard: _
             Token::Underscore => {
                 self.advance();
                 Ok(Pattern::Wildcard)
             }
-            // Variable or Variant: x or Some or Some(...)
             Token::Ident(name) => {
-                let variant_name = name.clone();
+                let val = name.clone();
                 self.advance();
 
-                // Check if this is a variant constructor with arguments: Some(x)
-                if self.match_token(&Token::LParen) {
-                    // Parse variant arguments
-                    let mut patterns = vec![];
+                // Check if this is a variant constructor with patterns
+                if Self::is_uppercase_ident(&val) {
+                    // Variant pattern
+                    if self.match_token(&Token::LParen) {
+                        // Variant with nested patterns: Some(x), Circle(r)
+                        let mut patterns = vec![];
 
-                    // Check for empty args: Some()
-                    if !matches!(self.current_token().token, Token::RParen) {
-                        loop {
-                            patterns.push(self.parse_pattern()?);
+                        if !matches!(self.current_token().token, Token::RParen) {
+                            loop {
+                                patterns.push(self.parse_pattern()?);
 
-                            if self.match_token(&Token::Comma) {
-                                // Check for trailing comma before RParen
-                                if matches!(self.current_token().token, Token::RParen) {
+                                if self.match_token(&Token::Comma) {
+                                    if matches!(self.current_token().token, Token::RParen) {
+                                        break;
+                                    }
+                                } else {
                                     break;
                                 }
-                            } else {
-                                break;
                             }
                         }
-                    }
 
-                    self.expect_token(Token::RParen)?;
-                    Ok(Pattern::Variant {
-                        variant: variant_name,
-                        patterns,
-                    })
+                        self.expect_token(Token::RParen)?;
+                        Ok(Pattern::Variant {
+                            variant: val,
+                            patterns,
+                        })
+                    } else {
+                        // Simple variant without patterns: None, Left
+                        Ok(Pattern::Variant {
+                            variant: val,
+                            patterns: vec![],
+                        })
+                    }
                 } else {
-                    // No parens - could be simple variant or variable binding
-                    // In pattern context, uppercase identifiers are typically variants
-                    // For now, we treat as variable - type checker will disambiguate
-                    Ok(Pattern::Var(variant_name))
+                    // Variable pattern
+                    Ok(Pattern::Var(val))
                 }
             }
-            // Literal: 42, true, "hello"
             Token::Int(n) => {
                 let val = *n;
                 self.advance();
@@ -838,13 +774,12 @@ impl Parser {
                 self.advance();
                 Ok(Pattern::Literal(Literal::Str(val)))
             }
-            // Tuple or grouped pattern: (p1, p2, ...) or (p)
             Token::LParen => {
                 self.advance(); // consume '('
 
-                // Empty tuple: ()
+                // Handle unit pattern: ()
                 if self.match_token(&Token::RParen) {
-                    return Ok(Pattern::Tuple(vec![]));
+                    return Ok(Pattern::Literal(Literal::Unit));
                 }
 
                 // Parse first pattern
@@ -982,10 +917,11 @@ impl Parser {
         Ok(left)
     }
 
-    /// Parse unary expression (unary minus)
+    /// Parse unary expressions (unary minus)
     fn parse_unary_expr(&mut self) -> Result<Expr> {
         if self.match_token(&Token::Minus) {
-            let expr = self.parse_unary_expr()?; // Right-associative
+            let expr = self.parse_unary_expr()?;
+            // Desugar unary minus as (0 - expr)
             Ok(Expr::BinOp {
                 op: BinOp::Sub,
                 left: Box::new(Expr::Lit(Literal::Int(0))),
@@ -994,6 +930,21 @@ impl Parser {
         } else {
             self.parse_app_expr()
         }
+    }
+
+    /// Parse pipeline expression: expr |> func
+    fn parse_pipeline_expr(&mut self) -> Result<Expr> {
+        let mut left = self.parse_or_expr()?;
+
+        while self.match_token(&Token::PipeRight) {
+            let func_expr = self.parse_app_expr()?; // The function to pipe into
+            left = Expr::App {
+                func: Box::new(func_expr),
+                arg: Box::new(left),
+            };
+        }
+
+        Ok(left)
     }
 
     /// Parse function application
@@ -1015,7 +966,108 @@ impl Parser {
             };
         }
 
+        // Post-process: convert variant constructor applications to VariantConstruct
+        // This handles `Some 42` syntax by converting App(Some, 42) to VariantConstruct
+        func = self.convert_variant_app_to_construct(func);
+
         Ok(func)
+    }
+
+    /// Convert function applications of variant constructors into VariantConstruct nodes.
+    ///
+    /// This enables F#-style variant syntax like `Some 42` instead of just `Some(42)`.
+    /// The function recursively collects all arguments applied to a variant constructor
+    /// and creates a single VariantConstruct with those arguments as fields.
+    ///
+    /// Examples:
+    /// - `Some 42` (App { func: VariantConstruct("Some", []), arg: 42 })
+    ///   becomes `VariantConstruct("Some", [42])`
+    /// - `Rectangle 10 20` becomes `VariantConstruct("Rectangle", [10, 20])`
+    fn convert_variant_app_to_construct(&self, expr: Expr) -> Expr {
+        match expr {
+            Expr::App { func, arg } => {
+                // Check if the function is a VariantConstruct (possibly nested in more Apps)
+                let (variant_opt, mut args) = self.extract_variant_and_args(*func, vec![]);
+                args.push(*arg);
+
+                if let Some((type_name, variant)) = variant_opt {
+                    // Convert to VariantConstruct with all collected arguments as fields
+                    Expr::VariantConstruct {
+                        type_name,
+                        variant,
+                        fields: args.into_iter().map(Box::new).collect(),
+                    }
+                } else {
+                    // Not a variant application, just return the original App
+                    // Rebuild from the collected expressions
+                    self.rebuild_app_from_args(args)
+                }
+            }
+            _ => expr,
+        }
+    }
+    /// Extract variant constructor and arguments from a chain of App nodes.
+    /// Returns (Some((type_name, variant)), args) if leftmost is a VariantConstruct,
+    /// or (None, args) otherwise.
+    fn extract_variant_and_args(
+        &self,
+        func: Expr,
+        mut current_args: Vec<Expr>,
+    ) -> (Option<(String, String)>, Vec<Expr>) {
+        match func {
+            Expr::VariantConstruct {
+                type_name,
+                variant,
+                fields,
+            } => {
+                // Found the variant constructor
+                // Prepend any existing fields to our arguments
+                let mut all_fields: Vec<Expr> = fields.into_iter().map(|b| *b).collect();
+                all_fields.extend(current_args);
+                (Some((type_name, variant)), all_fields)
+            }
+            Expr::App {
+                func: inner_func,
+                arg,
+            } => {
+                // Another App in the chain, collect the argument and recurse
+                current_args.insert(0, *arg);
+                self.extract_variant_and_args(*inner_func, current_args)
+            }
+            _ => {
+                // Not a variant constructor, return None and include the leftmost expr in args
+                current_args.insert(0, func);
+                (None, current_args)
+            }
+        }
+    }
+
+    /// Extract the leftmost expression and all arguments from a chain of App nodes.
+    fn extract_app_chain(&self, expr: Expr) -> (Expr, Vec<Expr>) {
+        match expr {
+            Expr::App { func, arg } => {
+                let (leftmost, mut args) = self.extract_app_chain(*func);
+                args.push(*arg);
+                (leftmost, args)
+            }
+            _ => (expr, vec![]),
+        }
+    }
+
+    /// Rebuild App nodes from a list of expressions (left-associative).
+    fn rebuild_app_from_args(&self, mut exprs: Vec<Expr>) -> Expr {
+        if exprs.is_empty() {
+            return Expr::Lit(Literal::Unit); // Shouldn't happen
+        }
+
+        let mut result = exprs.remove(0);
+        for arg in exprs {
+            result = Expr::App {
+                func: Box::new(result),
+                arg: Box::new(arg),
+            };
+        }
+        result
     }
 
     /// Parse postfix expressions (array indexing, array update, record access)
@@ -1139,17 +1191,8 @@ impl Parser {
                         if matches!(self.current_token().token, Token::RBrace) {
                             break;
                         }
-                    } else if matches!(self.current_token().token, Token::RBrace) {
-                        // No semicolon, but closing brace - this is ok for last field
-                        break;
                     } else {
-                        // No semicolon and no closing brace - error
-                        let tok = self.current_token();
-                        return Err(ParseError::UnexpectedToken {
-                            expected: "';' or '}'".to_string(),
-                            found: tok.token.clone(),
-                            pos: tok.pos,
-                        });
+                        break;
                     }
                 }
 
@@ -1159,13 +1202,12 @@ impl Parser {
             }
         }
 
-        // If we get here, it's a record literal
-        // Restore position and parse as record literal
+        // Not a record update, restore position and parse as record literal
         self.pos = save_pos;
 
+        // Parse record literal fields
         let mut fields = vec![];
 
-        // Parse fields
         loop {
             let field_name = self.expect_ident()?;
             self.expect_token(Token::Eq)?;
@@ -1178,24 +1220,67 @@ impl Parser {
                 if matches!(self.current_token().token, Token::RBrace) {
                     break;
                 }
-            } else if matches!(self.current_token().token, Token::RBrace) {
-                // No semicolon, but closing brace - this is ok for last field
-                break;
             } else {
-                // No semicolon and no closing brace - error
-                let tok = self.current_token();
-                return Err(ParseError::UnexpectedToken {
-                    expected: "';' or '}'".to_string(),
-                    found: tok.token.clone(),
-                    pos: tok.pos,
-                });
+                break;
             }
         }
 
         self.expect_token(Token::RBrace)?;
 
         Ok(Expr::RecordLiteral {
-            type_name: String::new(), // Inferred by typechecker
+            type_name: String::new(),
+            fields,
+        })
+    }
+
+    /// Parse anonymous record literal: {| name = "John"; age = 30 |}
+    /// Anonymous records use the {| ... |} syntax and work exactly like regular records
+    /// but without requiring a type declaration.
+    fn parse_anonymous_record_literal(&mut self) -> Result<Expr> {
+        self.expect_token(Token::LBracePipe)?;
+
+        // Empty anonymous record: {||}
+        if self.match_token(&Token::PipeRBrace) {
+            return Ok(Expr::RecordLiteral {
+                type_name: String::new(),
+                fields: vec![],
+            });
+        }
+
+        // Anonymous records don't support the 'with' update syntax in the literal itself
+        // Parse fields
+        let mut fields = vec![];
+
+        loop {
+            let field_name = self.expect_ident()?;
+            self.expect_token(Token::Eq)?;
+            let value = self.parse_expr()?;
+            fields.push((field_name, Box::new(value)));
+
+            // Check for semicolon or closing brace
+            if self.match_token(&Token::Semicolon) {
+                // Check for trailing semicolon before |}
+                if matches!(self.current_token().token, Token::PipeRBrace) {
+                    break;
+                }
+            } else if matches!(self.current_token().token, Token::PipeRBrace) {
+                // No semicolon, but closing brace - this is ok for last field
+                break;
+            } else {
+                // No semicolon and no closing brace - error
+                let tok = self.current_token();
+                return Err(ParseError::UnexpectedToken {
+                    expected: "';' or '|}'".to_string(),
+                    found: tok.token.clone(),
+                    pos: tok.pos,
+                });
+            }
+        }
+
+        self.expect_token(Token::PipeRBrace)?;
+
+        Ok(Expr::RecordLiteral {
+            type_name: String::new(), // Anonymous records have no type name
             fields,
         })
     }
@@ -1231,6 +1316,7 @@ impl Parser {
             })
         } else {
             // Simple variant without fields: None, Left
+            // This will be converted to VariantConstruct with fields if followed by arguments
             Ok(Expr::VariantConstruct {
                 type_name: String::new(),
                 variant: variant_name,
@@ -1338,128 +1424,19 @@ impl Parser {
                     self.expect_token(Token::RParen)?;
                     Ok(Expr::Tuple(elements))
                 } else {
-                    // No comma, it's a grouped expression: (e)
+                    // Just grouped expression: (e)
                     self.expect_token(Token::RParen)?;
                     Ok(first_expr)
                 }
             }
-            Token::LBracket => {
-                self.advance(); // consume '['
-
-                let mut elements = vec![];
-
-                // Empty list: []
-                if self.match_token(&Token::RBracket) {
-                    return Ok(Expr::List(elements));
-                }
-
-                // Parse first element
-                elements.push(self.parse_expr()?);
-
-                // Parse remaining elements: ; e1 ; e2 ...
-                while self.match_token(&Token::Semicolon) {
-                    // Check for trailing semicolon before RBracket
-                    if matches!(self.current_token().token, Token::RBracket) {
-                        break; // trailing semicolon
-                    }
-                    elements.push(self.parse_expr()?);
-                }
-
-                self.expect_token(Token::RBracket)?;
-                Ok(Expr::List(elements))
-            }
-            Token::LBracketPipe => {
-                self.advance(); // consume '[|'
-                let mut elements = vec![];
-
-                // Empty array: [||]
-                if self.match_token(&Token::PipeRBracket) {
-                    return Ok(Expr::Array(elements));
-                }
-
-                // Parse first element
-                elements.push(self.parse_expr()?);
-
-                // Parse remaining elements: ; e1 ; e2 ...
-                while self.match_token(&Token::Semicolon) {
-                    // Check for trailing semicolon before |]
-                    if matches!(self.current_token().token, Token::PipeRBracket) {
-                        break; // trailing semicolon
-                    }
-                    elements.push(self.parse_expr()?);
-                }
-
-                self.expect_token(Token::PipeRBracket)?;
-                Ok(Expr::Array(elements))
-            }
-            Token::LBrace => {
-                // Record literal or record update: { name = "John" } or { person with age = 31 }
-                self.parse_record_literal()
-            }
-            _ => Err(ParseError::UnexpectedToken {
-                expected: "expression".to_string(),
-                found: tok.token.clone(),
-                pos: tok.pos,
-            }),
-        }
-    }
-
-    // ========================================================================
-    // Type Expression Parsing (Issue #15 Layer 2)
-    // ========================================================================
-
-    #[allow(dead_code)]
-    /// Parse type expression
-    fn parse_type_expr(&mut self) -> Result<TypeExpr> {
-        self.parse_type_function()
-    }
-
-    #[allow(dead_code)]
-    /// Parse function type: T1 -> T2
-    fn parse_type_function(&mut self) -> Result<TypeExpr> {
-        let mut left = self.parse_type_tuple()?;
-        if self.peek() == Some(&Token::Arrow) {
-            self.advance();
-            let right = self.parse_type_function()?;
-            left = TypeExpr::Function(Box::new(left), Box::new(right));
-        }
-        Ok(left)
-    }
-
-    /// Parse tuple type: T1 * T2 * T3
-    #[allow(dead_code)]
-    fn parse_type_tuple(&mut self) -> Result<TypeExpr> {
-        let mut types = vec![self.parse_type_primary()?];
-        while self.peek() == Some(&Token::Star) {
-            self.advance();
-            types.push(self.parse_type_primary()?);
-        }
-        if types.len() == 1 {
-            Ok(types.into_iter().next().unwrap())
-        } else {
-            Ok(TypeExpr::Tuple(types))
-        }
-    }
-
-    #[allow(dead_code)]
-    /// Parse primary type expression
-    fn parse_type_primary(&mut self) -> Result<TypeExpr> {
-        match self.peek() {
-            Some(Token::Ident(name)) => {
-                let type_name = name.clone();
-                self.advance();
-                Ok(TypeExpr::Named(type_name))
-            }
-            Some(Token::LParen) => {
-                self.advance();
-                let ty = self.parse_type_expr()?;
-                self.expect_token(Token::RParen)?;
-                Ok(ty)
-            }
+            Token::LBracket => self.parse_list(),
+            Token::LBracketPipe => self.parse_array(),
+            Token::LBracePipe => self.parse_anonymous_record_literal(),
+            Token::LBrace => self.parse_record_literal(),
             _ => {
                 let tok = self.current_token();
                 Err(ParseError::UnexpectedToken {
-                    expected: "type".to_string(),
+                    expected: "expression".to_string(),
                     found: tok.token.clone(),
                     pos: tok.pos,
                 })
@@ -1467,73 +1444,243 @@ impl Parser {
         }
     }
 
-    // ========================================================================
-    // Discriminated Union Parsing (Issue #29 Layer 2)
-    // ========================================================================
+    /// Parse list: [1; 2; 3] or []
+    fn parse_list(&mut self) -> Result<Expr> {
+        self.expect_token(Token::LBracket)?;
 
-    /// Parse discriminated union type definition
-    /// type Option = Some of int | None
-    /// type Shape = Circle of float | Rectangle of float * float
-    #[allow(dead_code)]
-    pub fn parse_du_type_def(&mut self) -> Result<DuTypeDef> {
-        // Expect 'type'
-        self.expect_token(Token::Type)?;
-
-        // Parse type name
-        let name = self.expect_ident()?;
-
-        // Expect '='
-        self.expect_token(Token::Eq)?;
-
-        // Parse variants separated by |
-        let mut variants = vec![];
-
-        // First variant (no leading |)
-        variants.push(self.parse_variant_def()?);
-
-        // Additional variants (each starts with |)
-        while self.match_token(&Token::Pipe) {
-            variants.push(self.parse_variant_def()?);
+        // Empty list: []
+        if self.match_token(&Token::RBracket) {
+            return Ok(Expr::List(vec![]));
         }
 
-        Ok(DuTypeDef { name, variants })
+        // Parse list elements
+        let mut elements = vec![];
+
+        loop {
+            elements.push(self.parse_expr()?);
+
+            // Check for semicolon separator
+            if self.match_token(&Token::Semicolon) {
+                // Check for trailing semicolon before ]
+                if matches!(self.current_token().token, Token::RBracket) {
+                    break;
+                }
+                // Otherwise continue parsing
+            } else {
+                break;
+            }
+        }
+
+        self.expect_token(Token::RBracket)?;
+
+        Ok(Expr::List(elements))
     }
 
-    /// Parse a single variant definition
-    /// Some of int
-    /// None
-    /// Rectangle of float * float
-    #[allow(dead_code)]
-    fn parse_variant_def(&mut self) -> Result<VariantDef> {
-        // Parse variant name
-        let name = self.expect_ident()?;
+    /// Parse array: [|1; 2; 3|] or [||]
+    fn parse_array(&mut self) -> Result<Expr> {
+        self.expect_token(Token::LBracketPipe)?;
 
-        // Check for 'of' keyword (variant with fields)
-        if self.match_token(&Token::Of) {
-            // Parse field types separated by *
-            let mut fields = vec![];
-
-            // First field type
-            fields.push(self.parse_type_primary()?);
-
-            // Additional field types (each starts with *)
-            while self.peek() == Some(&Token::Star) {
-                self.advance(); // consume *
-                fields.push(self.parse_type_primary()?);
-            }
-
-            Ok(VariantDef::new(name, fields))
-        } else {
-            // Simple variant with no fields
-            Ok(VariantDef::new_simple(name))
+        // Empty array: [||]
+        if self.match_token(&Token::PipeRBracket) {
+            return Ok(Expr::Array(vec![]));
         }
+
+        // Parse array elements
+        let mut elements = vec![];
+
+        loop {
+            elements.push(self.parse_expr()?);
+
+            // Check for semicolon separator
+            if self.match_token(&Token::Semicolon) {
+                // Check for trailing semicolon before |]
+                if matches!(self.current_token().token, Token::PipeRBracket) {
+                    break;
+                }
+                // Otherwise continue parsing
+            } else {
+                break;
+            }
+        }
+
+        self.expect_token(Token::PipeRBracket)?;
+
+        Ok(Expr::Array(elements))
+    }
+
+    /// Parse DU type definition: type Option = Some of int | None
+    pub fn parse_du_type_def(&mut self) -> Result<DuTypeDef> {
+        self.expect_token(Token::Type)?;
+
+        let type_name = self.expect_ident()?;
+
+        self.expect_token(Token::Eq)?;
+
+        // Parse variants
+        let mut variants = vec![];
+
+        // Optional leading pipe
+        if self.match_token(&Token::Pipe) {
+            // If we consumed a leading pipe, there must be a variant name following
+            // This catches errors like "type T = | " or "type T = | |"
+            let tok = self.current_token();
+            if !matches!(&tok.token, Token::Ident(_)) {
+                return Err(ParseError::UnexpectedToken {
+                    expected: "variant name".to_string(),
+                    found: tok.token.clone(),
+                    pos: tok.pos,
+                });
+            }
+        }
+
+        loop {
+            let variant_name = self.expect_ident()?;
+
+            // Check for 'of' keyword (variant with fields)
+            let fields = if self.match_token(&Token::Of) {
+                let mut field_types = vec![];
+
+                loop {
+                    let ty = self.parse_type_expr()?;
+                    field_types.push(ty);
+
+                    // Check for * separator (for tuple-like fields)
+                    if !self.match_token(&Token::Star) {
+                        break;
+                    }
+                }
+
+                field_types
+            } else {
+                vec![]
+            };
+
+            variants.push(VariantDef {
+                name: variant_name,
+                fields,
+            });
+
+            // Check for another variant (starts with |)
+            if !self.match_token(&Token::Pipe) {
+                break;
+            }
+        }
+
+        Ok(DuTypeDef {
+            name: type_name,
+            variants,
+        })
+    }
+
+    /// Parse type expression for type annotations
+    fn parse_type_expr(&mut self) -> Result<TypeExpr> {
+        // Parse a simple type or function type
+        // Note: tuple types (int * int) are handled by the caller (parse_du_type_def)
+        // because the * separator is used differently in DU definitions
+        let left = self.parse_simple_type()?;
+
+        // Check for function type: int -> string
+        if self.match_token(&Token::Arrow) {
+            let right = self.parse_type_expr()?; // Right-associative
+            return Ok(TypeExpr::Function(Box::new(left), Box::new(right)));
+        }
+
+        Ok(left)
+    }
+
+    /// Parse simple type (identifier)
+    fn parse_simple_type(&mut self) -> Result<TypeExpr> {
+        let name = self.expect_ident()?;
+        Ok(TypeExpr::Named(name))
     }
 
     // ========================================================================
     // Helper Methods
     // ========================================================================
 
-    /// Check if current token starts a primary expression
+    /// Get the current token (or EOF if at end)
+    fn current_token(&self) -> &TokenWithPos {
+        if self.is_at_end() {
+            // Return a special EOF token
+            static EOF_TOKEN: std::sync::OnceLock<TokenWithPos> = std::sync::OnceLock::new();
+            EOF_TOKEN.get_or_init(|| TokenWithPos {
+                token: Token::Eof,
+                pos: Position::new(0, 0, 0),
+            })
+        } else {
+            &self.tokens[self.pos]
+        }
+    }
+
+    /// Peek at the current token without consuming it
+    fn peek(&self) -> Option<&Token> {
+        if self.is_at_end() {
+            None
+        } else {
+            Some(&self.tokens[self.pos].token)
+        }
+    }
+
+    /// Check if current token matches without consuming
+    fn check(&self, token: &Token) -> bool {
+        !self.is_at_end() && &self.tokens[self.pos].token == token
+    }
+
+    /// Advance to next token
+    fn advance(&mut self) {
+        if !self.is_at_end() {
+            self.pos += 1;
+        }
+    }
+
+    /// Check if we're at EOF
+    fn is_at_end(&self) -> bool {
+        self.pos >= self.tokens.len() || matches!(self.tokens[self.pos].token, Token::Eof)
+    }
+
+    /// Match and consume token if it matches
+    fn match_token(&mut self, token: &Token) -> bool {
+        if self.check(token) {
+            self.advance();
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Expect a specific token and consume it
+    fn expect_token(&mut self, expected: Token) -> Result<()> {
+        if self.check(&expected) {
+            self.advance();
+            Ok(())
+        } else {
+            let tok = self.current_token();
+            Err(ParseError::UnexpectedToken {
+                expected: format!("{}", expected),
+                found: tok.token.clone(),
+                pos: tok.pos,
+            })
+        }
+    }
+
+    /// Expect an identifier and return it
+    fn expect_ident(&mut self) -> Result<String> {
+        let tok = self.current_token();
+        match &tok.token {
+            Token::Ident(name) => {
+                let val = name.clone();
+                self.advance();
+                Ok(val)
+            }
+            _ => Err(ParseError::UnexpectedToken {
+                expected: "identifier".to_string(),
+                found: tok.token.clone(),
+                pos: tok.pos,
+            }),
+        }
+    }
+
+    /// Check if current token could start a primary expression
     fn is_primary_start(&self) -> bool {
         if self.is_at_end() {
             return false;
@@ -1553,7 +1700,7 @@ impl Parser {
         )
     }
 
-    /// Try to match a comparison operator
+    /// Try to match comparison operator
     fn match_comparison_op(&mut self) -> Option<BinOp> {
         let tok = &self.current_token().token;
         let op = match tok {
@@ -1574,7 +1721,7 @@ impl Parser {
         op
     }
 
-    /// Try to match addition/subtraction operator
+    /// Try to match addition operator
     fn match_add_op(&mut self) -> Option<BinOp> {
         let tok = &self.current_token().token;
         let op = match tok {
@@ -1590,7 +1737,7 @@ impl Parser {
         op
     }
 
-    /// Try to match multiplication/division operator
+    /// Try to match multiplication operator
     fn match_mul_op(&mut self) -> Option<BinOp> {
         let tok = &self.current_token().token;
         let op = match tok {
@@ -1605,107 +1752,6 @@ impl Parser {
 
         op
     }
-
-    /// Try to match a specific token, consuming it if matched
-    fn match_token(&mut self, expected: &Token) -> bool {
-        if self.is_at_end() {
-            return false;
-        }
-
-        if &self.current_token().token == expected {
-            self.advance();
-            true
-        } else {
-            false
-        }
-    }
-
-    /// Check if a token matches without consuming
-    fn check(&self, expected: &Token) -> bool {
-        if self.is_at_end() {
-            return false;
-        }
-        &self.current_token().token == expected
-    }
-
-    /// Expect a specific token, returning error if not found
-    fn expect_token(&mut self, expected: Token) -> Result<()> {
-        if self.is_at_end() {
-            return Err(ParseError::UnexpectedEof {
-                expected: format!("{}", expected),
-            });
-        }
-
-        let tok = self.current_token();
-        if tok.token == expected {
-            self.advance();
-            Ok(())
-        } else {
-            Err(ParseError::UnexpectedToken {
-                expected: format!("{}", expected),
-                found: tok.token.clone(),
-                pos: tok.pos,
-            })
-        }
-    }
-
-    /// Expect an identifier, returning its name
-    fn expect_ident(&mut self) -> Result<String> {
-        if self.is_at_end() {
-            return Err(ParseError::UnexpectedEof {
-                expected: "identifier".to_string(),
-            });
-        }
-
-        let tok = self.current_token();
-        match &tok.token {
-            Token::Ident(name) => {
-                let result = name.clone();
-                self.advance();
-                Ok(result)
-            }
-            _ => Err(ParseError::UnexpectedToken {
-                expected: "identifier".to_string(),
-                found: tok.token.clone(),
-                pos: tok.pos,
-            }),
-        }
-    }
-
-    #[allow(dead_code)]
-    /// Peek at the current token without position info
-    fn peek(&self) -> Option<&Token> {
-        if self.is_at_end() {
-            None
-        } else {
-            Some(&self.tokens[self.pos].token)
-        }
-    }
-
-    /// Get the current token (or EOF if at end)
-    fn current_token(&self) -> &TokenWithPos {
-        if self.pos < self.tokens.len() {
-            &self.tokens[self.pos]
-        } else {
-            // Return EOF token if beyond bounds
-            self.tokens.last().unwrap()
-        }
-    }
-
-    /// Advance to the next token
-    fn advance(&mut self) {
-        if !self.is_at_end() {
-            self.pos += 1;
-        }
-    }
-
-    /// Check if we're at the end of the token stream
-    fn is_at_end(&self) -> bool {
-        if self.pos >= self.tokens.len() {
-            return true;
-        }
-        matches!(self.tokens[self.pos].token, Token::Eof)
-    }
 }
 
 #[cfg(test)]
@@ -1713,1203 +1759,34 @@ mod tests {
     use super::*;
     use crate::lexer::Lexer;
 
-    // Helper function to parse a string
-    fn parse(input: &str) -> Result<Expr> {
+    fn parse_str(input: &str) -> Result<Expr> {
         let mut lexer = Lexer::new(input);
         let tokens = lexer.tokenize().unwrap();
         let mut parser = Parser::new(tokens);
         parser.parse()
     }
 
-    // Helper function to parse a program
-    fn parse_program(input: &str) -> Result<Program> {
-        let mut lexer = Lexer::new(input);
-        let tokens = lexer.tokenize().unwrap();
-        let mut parser = Parser::new(tokens);
-        parser.parse_program()
-    }
-
-    // ========================================================================
-    // Module System Tests (Phase 3 Cycle 2)
-    // ========================================================================
-
-    #[test]
-    fn test_parse_simple_module() {
-        let source = r#"
-            module Math =
-                let add x y = x + y
-                let multiply x y = x * y
-        "#;
-
-        let program = parse_program(source).unwrap();
-
-        assert_eq!(program.modules.len(), 1);
-        assert_eq!(program.modules[0].name, "Math");
-        assert_eq!(program.modules[0].items.len(), 2);
-    }
-
-    #[test]
-    fn test_parse_module_with_single_binding() {
-        let source = "module Test = let x = 42";
-
-        let program = parse_program(source).unwrap();
-
-        assert_eq!(program.modules.len(), 1);
-        assert_eq!(program.modules[0].name, "Test");
-        assert_eq!(program.modules[0].items.len(), 1);
-
-        match &program.modules[0].items[0] {
-            ModuleItem::Let(name, _) => assert_eq!(name.as_deref(), Some("x")),
-            _ => panic!("Expected Let item"),
-        }
-    }
-
-    #[test]
-    fn test_parse_import_simple() {
-        let source = r#"
-            open Math
-
-            add 5 10
-        "#;
-
-        let program = parse_program(source).unwrap();
-
-        assert_eq!(program.imports.len(), 1);
-        assert_eq!(program.imports[0].module_path, vec!["Math"]);
-        assert!(program.main_expr.is_some());
-    }
-
-    #[test]
-    fn test_parse_import_qualified() {
-        let source = "open Math.Geometry";
-
-        let program = parse_program(source).unwrap();
-
-        assert_eq!(program.imports.len(), 1);
-        assert_eq!(program.imports[0].module_path, vec!["Math", "Geometry"]);
-    }
-
-    #[test]
-    fn test_parse_module_with_function() {
-        let source = r#"
-            module Utils =
-                let identity x = x
-                let const x y = x
-        "#;
-
-        let program = parse_program(source).unwrap();
-
-        assert_eq!(program.modules.len(), 1);
-        assert_eq!(program.modules[0].items.len(), 2);
-    }
-
-    #[test]
-    fn test_parse_complete_program() {
-        let source = r#"
-            module Math =
-                let add x y = x + y
-                let multiply x y = x * y
-
-            module Utils =
-                let identity x = x
-        "#;
-
-        let program = parse_program(source).unwrap();
-
-        assert_eq!(program.modules.len(), 2);
-        assert_eq!(program.imports.len(), 0);
-        assert!(program.main_expr.is_none());
-    }
-
-    #[test]
-    fn test_parse_program_modules_only() {
-        let source = r#"
-            module A =
-                let x = 1
-
-            module B =
-                let y = 2
-        "#;
-
-        let program = parse_program(source).unwrap();
-
-        assert_eq!(program.modules.len(), 2);
-        assert_eq!(program.imports.len(), 0);
-        assert!(program.main_expr.is_none());
-    }
-
-    #[test]
-    fn test_parse_program_imports_and_expr() {
-        let source = r#"
-            open Math
-            open Utils
-
-            add 1 2
-        "#;
-
-        let program = parse_program(source).unwrap();
-
-        assert_eq!(program.imports.len(), 2);
-        assert!(program.main_expr.is_some());
-    }
-
-    #[test]
-    fn test_parse_empty_module() {
-        let source = "module Empty =";
-
-        // This should parse successfully with an empty module
-        let program = parse_program(source).unwrap();
-
-        assert_eq!(program.modules.len(), 1);
-        assert_eq!(program.modules[0].items.len(), 0);
-    }
-
-    #[test]
-    fn test_parse_program_multiple_top_level_bindings() {
-        let source = r#"
-let x = 1
-let y = 2
-x + y
-"#;
-
-        let program = parse_program(source).unwrap();
-
-        assert_eq!(program.items.len(), 2);
-        assert!(program.main_expr.is_some());
-    }
-
-    #[test]
-    fn test_parse_discard_variable() {
-        let source = r#"
-let _ = 42
-10
-"#;
-
-        let program = parse_program(source).unwrap();
-
-        assert_eq!(program.items.len(), 1);
-        match &program.items[0] {
-            ModuleItem::Let(name, _) => assert_eq!(name.as_deref(), None),
-            _ => panic!("Expected Let item"),
-        }
-        assert!(program.main_expr.is_some());
-    }
-
-    #[test]
-    fn test_parse_do_block() {
-        let source = r#"
-do ()
-let x = 5
-x
-"#;
-
-        let program = parse_program(source).unwrap();
-
-        assert_eq!(program.items.len(), 2);
-        // First item should be a do block (Let with None name)
-        match &program.items[0] {
-            ModuleItem::Let(name, _) => assert_eq!(name.as_deref(), None),
-            _ => panic!("Expected Let item"),
-        }
-        // Second item should be a normal let binding
-        match &program.items[1] {
-            ModuleItem::Let(name, _) => assert_eq!(name.as_deref(), Some("x")),
-            _ => panic!("Expected Let item"),
-        }
-        assert!(program.main_expr.is_some());
-    }
-
-    #[test]
-    fn test_parse_mixed_discard_and_do() {
-        let source = r#"
-let _ = 10 + 20
-do ()
-let x = 5
-x * 2
-"#;
-
-        let program = parse_program(source).unwrap();
-
-        assert_eq!(program.items.len(), 3);
-        // First item: let _ = 10 + 20
-        match &program.items[0] {
-            ModuleItem::Let(name, _) => assert_eq!(name.as_deref(), None),
-            _ => panic!("Expected Let item"),
-        }
-        // Second item: do ()
-        match &program.items[1] {
-            ModuleItem::Let(name, _) => assert_eq!(name.as_deref(), None),
-            _ => panic!("Expected Let item"),
-        }
-        // Third item: let x = 5
-        match &program.items[2] {
-            ModuleItem::Let(name, _) => assert_eq!(name.as_deref(), Some("x")),
-            _ => panic!("Expected Let item"),
-        }
-        assert!(program.main_expr.is_some());
-    }
-
-    // ========================================================================
-    // Literal Tests
-    // ========================================================================
-
     #[test]
     fn test_parse_int() {
-        let expr = parse("42").unwrap();
-        assert_eq!(expr, Expr::Lit(Literal::Int(42)));
+        let expr = parse_str("42").unwrap();
+        assert!(matches!(expr, Expr::Lit(Literal::Int(42))));
     }
 
     #[test]
-    fn test_parse_float() {
-        let expr = parse("2.5").unwrap();
-        assert_eq!(expr, Expr::Lit(Literal::Float(2.5)));
-    }
-
-    #[test]
-    fn test_parse_bool_true() {
-        let expr = parse("true").unwrap();
-        assert_eq!(expr, Expr::Lit(Literal::Bool(true)));
-    }
-
-    #[test]
-    fn test_parse_bool_false() {
-        let expr = parse("false").unwrap();
-        assert_eq!(expr, Expr::Lit(Literal::Bool(false)));
-    }
-
-    #[test]
-    fn test_parse_string() {
-        let expr = parse("\"hello\"").unwrap();
-        assert_eq!(expr, Expr::Lit(Literal::Str("hello".to_string())));
-    }
-
-    #[test]
-    fn test_parse_unit() {
-        let expr = parse("()").unwrap();
-        assert_eq!(expr, Expr::Lit(Literal::Unit));
-    }
-
-    // ========================================================================
-    // Variable Tests
-    // ========================================================================
-
-    #[test]
-    fn test_parse_var() {
-        let expr = parse("x").unwrap();
-        assert_eq!(expr, Expr::Var("x".to_string()));
-    }
-
-    #[test]
-    fn test_parse_var_long_name() {
-        let expr = parse("myVariable123").unwrap();
-        assert_eq!(expr, Expr::Var("myVariable123".to_string()));
-    }
-
-    // ========================================================================
-    // Binary Operation Tests
-    // ========================================================================
-
-    #[test]
-    fn test_parse_add() {
-        let expr = parse("1 + 2").unwrap();
-        assert!(matches!(expr, Expr::BinOp { op: BinOp::Add, .. }));
-    }
-
-    #[test]
-    fn test_parse_sub() {
-        let expr = parse("5 - 3").unwrap();
-        assert!(matches!(expr, Expr::BinOp { op: BinOp::Sub, .. }));
-    }
-
-    #[test]
-    fn test_parse_mul() {
-        let expr = parse("4 * 5").unwrap();
-        assert!(matches!(expr, Expr::BinOp { op: BinOp::Mul, .. }));
-    }
-
-    #[test]
-    fn test_parse_div() {
-        let expr = parse("10 / 2").unwrap();
-        assert!(matches!(expr, Expr::BinOp { op: BinOp::Div, .. }));
-    }
-
-    #[test]
-    fn test_parse_eq() {
-        let expr = parse("x = y").unwrap();
-        assert!(matches!(expr, Expr::BinOp { op: BinOp::Eq, .. }));
-    }
-
-    #[test]
-    fn test_parse_neq() {
-        let expr = parse("x <> y").unwrap();
-        assert!(matches!(expr, Expr::BinOp { op: BinOp::Neq, .. }));
-    }
-
-    #[test]
-    fn test_parse_lt() {
-        let expr = parse("x < y").unwrap();
-        assert!(matches!(expr, Expr::BinOp { op: BinOp::Lt, .. }));
-    }
-
-    #[test]
-    fn test_parse_lte() {
-        let expr = parse("x <= y").unwrap();
-        assert!(matches!(expr, Expr::BinOp { op: BinOp::Lte, .. }));
-    }
-
-    #[test]
-    fn test_parse_gt() {
-        let expr = parse("x > y").unwrap();
-        assert!(matches!(expr, Expr::BinOp { op: BinOp::Gt, .. }));
-    }
-
-    #[test]
-    fn test_parse_gte() {
-        let expr = parse("x >= y").unwrap();
-        assert!(matches!(expr, Expr::BinOp { op: BinOp::Gte, .. }));
-    }
-
-    #[test]
-    fn test_parse_and() {
-        let expr = parse("true && false").unwrap();
-        assert!(matches!(expr, Expr::BinOp { op: BinOp::And, .. }));
-    }
-
-    #[test]
-    fn test_parse_or() {
-        let expr = parse("true || false").unwrap();
-        assert!(matches!(expr, Expr::BinOp { op: BinOp::Or, .. }));
-    }
-
-    // ========================================================================
-    // Precedence Tests
-    // ========================================================================
-
-    #[test]
-    fn test_parse_precedence_mul_add() {
-        // 1 + 2 * 3 should be 1 + (2 * 3)
-        let expr = parse("1 + 2 * 3").unwrap();
-        if let Expr::BinOp {
-            op: BinOp::Add,
-            left,
-            right,
-        } = expr
-        {
-            assert_eq!(*left, Expr::Lit(Literal::Int(1)));
-            assert!(matches!(*right, Expr::BinOp { op: BinOp::Mul, .. }));
-        } else {
-            panic!("Expected Add at root");
-        }
-    }
-
-    #[test]
-    fn test_parse_precedence_add_mul() {
-        // 2 * 3 + 1 should be (2 * 3) + 1
-        let expr = parse("2 * 3 + 1").unwrap();
-        if let Expr::BinOp {
-            op: BinOp::Add,
-            left,
-            right,
-        } = expr
-        {
-            assert!(matches!(*left, Expr::BinOp { op: BinOp::Mul, .. }));
-            assert_eq!(*right, Expr::Lit(Literal::Int(1)));
-        } else {
-            panic!("Expected Add at root");
-        }
-    }
-
-    #[test]
-    fn test_parse_precedence_comp_add() {
-        // x + 1 < y + 2 should be (x + 1) < (y + 2)
-        let expr = parse("x + 1 < y + 2").unwrap();
-        assert!(matches!(expr, Expr::BinOp { op: BinOp::Lt, .. }));
-    }
-
-    #[test]
-    fn test_parse_precedence_and_or() {
-        // a || b && c should be a || (b && c)
-        let expr = parse("a || b && c").unwrap();
-        if let Expr::BinOp {
-            op: BinOp::Or,
-            left,
-            right,
-        } = expr
-        {
-            assert_eq!(*left, Expr::Var("a".to_string()));
-            assert!(matches!(*right, Expr::BinOp { op: BinOp::And, .. }));
-        } else {
-            panic!("Expected Or at root");
-        }
-    }
-
-    // ========================================================================
-    // Let-Binding Tests
-    // ========================================================================
-
-    #[test]
-    fn test_parse_let_simple() {
-        let expr = parse("let x = 42 in x").unwrap();
+    fn test_parse_let() {
+        let expr = parse_str("let x = 42 in x").unwrap();
         assert!(expr.is_let());
     }
 
     #[test]
-    fn test_parse_let_with_expr() {
-        let expr = parse("let x = 1 + 2 in x * 3").unwrap();
-        assert!(expr.is_let());
-    }
-
-    #[test]
-    fn test_parse_let_nested() {
-        let expr = parse("let x = 1 in let y = 2 in x + y").unwrap();
-        assert!(expr.is_let());
-        if let Expr::Let { body, .. } = expr {
-            assert!(body.is_let());
-        }
-    }
-
-    #[test]
-    fn test_parse_let_function() {
-        let expr = parse("let f x = x + 1 in f 5").unwrap();
-        assert!(expr.is_let());
-    }
-
-    #[test]
-    fn test_parse_let_function_multi_param() {
-        let expr = parse("let add x y = x + y in add 1 2").unwrap();
-        assert!(expr.is_let());
-    }
-
-    // ========================================================================
-    // Lambda Tests
-    // ========================================================================
-
-    #[test]
-    fn test_parse_lambda_simple() {
-        let expr = parse("fun x -> x + 1").unwrap();
-        assert!(expr.is_lambda());
-    }
-
-    #[test]
-    fn test_parse_lambda_nested() {
-        let expr = parse("fun x -> fun y -> x + y").unwrap();
-        assert!(expr.is_lambda());
-        if let Expr::Lambda { body, .. } = expr {
-            assert!(body.is_lambda());
-        }
-    }
-
-    #[test]
-    fn test_parse_lambda_multi_param() {
-        // Multi-parameter lambda: fun x y -> x + y
-        let expr = parse("fun x y -> x + y").unwrap();
-        assert!(expr.is_lambda());
-        // Should be desugared to: fun x -> (fun y -> x + y)
-        if let Expr::Lambda { param, body } = expr {
-            assert_eq!(param, "x");
-            assert!(body.is_lambda());
-            if let Expr::Lambda {
-                param: inner_param,
-                body: inner_body,
-            } = *body
-            {
-                assert_eq!(inner_param, "y");
-                assert!(inner_body.is_binop());
-            }
-        }
-    }
-
-    #[test]
-    fn test_parse_lambda_triple_param() {
-        // Triple-parameter lambda: fun x y z -> x + y + z
-        let expr = parse("fun x y z -> x + y + z").unwrap();
-        assert!(expr.is_lambda());
-        // Should be: fun x -> (fun y -> (fun z -> x + y + z))
-        if let Expr::Lambda { param, body } = expr {
-            assert_eq!(param, "x");
-            if let Expr::Lambda { param, body } = *body {
-                assert_eq!(param, "y");
-                if let Expr::Lambda { param, body: _ } = *body {
-                    assert_eq!(param, "z");
-                }
-            }
-        }
-    }
-
-    // ========================================================================
-    // Function Application Tests
-    // ========================================================================
-
-    #[test]
-    fn test_parse_app_simple() {
-        let expr = parse("f x").unwrap();
+    fn test_parse_application() {
+        let expr = parse_str("f x").unwrap();
         assert!(expr.is_app());
     }
 
     #[test]
-    fn test_parse_app_multi() {
-        let expr = parse("f x y").unwrap();
-        assert!(expr.is_app());
-        // Should be ((f x) y)
-        if let Expr::App { func, .. } = expr {
-            assert!(func.is_app());
-        }
-    }
-
-    #[test]
-    fn test_parse_app_with_literal() {
-        let expr = parse("f 42").unwrap();
-        assert!(expr.is_app());
-    }
-
-    // ========================================================================
-    // If-Then-Else Tests
-    // ========================================================================
-
-    #[test]
-    fn test_parse_if_simple() {
-        let expr = parse("if true then 1 else 2").unwrap();
-        assert!(expr.is_if());
-    }
-
-    #[test]
-    fn test_parse_if_with_comparison() {
-        let expr = parse("if x > 0 then 1 else -1").unwrap();
-        assert!(expr.is_if());
-    }
-
-    #[test]
-    fn test_parse_if_nested() {
-        let expr = parse("if x > 0 then if y > 0 then 1 else 2 else 3").unwrap();
-        assert!(expr.is_if());
-    }
-
-    // ========================================================================
-    // Tuple Tests
-    // ========================================================================
-
-    #[test]
-    fn test_parse_tuple_pair() {
-        let expr = parse("(1, 2)").unwrap();
-        assert!(expr.is_tuple());
-        if let Expr::Tuple(elements) = expr {
-            assert_eq!(elements.len(), 2);
-        }
-    }
-
-    #[test]
-    fn test_parse_tuple_triple() {
-        let expr = parse("(1, 2, 3)").unwrap();
-        assert!(expr.is_tuple());
-        if let Expr::Tuple(elements) = expr {
-            assert_eq!(elements.len(), 3);
-        }
-    }
-
-    #[test]
-    fn test_parse_tuple_trailing_comma() {
-        let expr = parse("(1,)").unwrap();
-        assert!(expr.is_tuple());
-        if let Expr::Tuple(elements) = expr {
-            assert_eq!(elements.len(), 1);
-        }
-    }
-
-    #[test]
-    fn test_parse_tuple_nested() {
-        let expr = parse("((1, 2), (3, 4))").unwrap();
-        assert!(expr.is_tuple());
-        if let Expr::Tuple(elements) = expr {
-            assert_eq!(elements.len(), 2);
-            assert!(elements[0].is_tuple());
-            assert!(elements[1].is_tuple());
-        }
-    }
-
-    #[test]
-    fn test_parse_grouped_expr() {
-        let expr = parse("(1 + 2)").unwrap();
-        // Should be just the BinOp, not a tuple
-        assert!(!expr.is_tuple());
-        assert!(expr.is_binop());
-    }
-
-    // ========================================================================
-    // List Tests
-    // ========================================================================
-
-    #[test]
-    fn test_parse_list_empty() {
-        let expr = parse("[]").unwrap();
-        assert!(expr.is_list());
-        if let Expr::List(elements) = expr {
-            assert_eq!(elements.len(), 0);
-        }
-    }
-
-    #[test]
-    fn test_parse_list_single() {
-        let expr = parse("[1]").unwrap();
-        assert!(expr.is_list());
-        if let Expr::List(elements) = expr {
-            assert_eq!(elements.len(), 1);
-        }
-    }
-
-    #[test]
-    fn test_parse_list_multiple() {
-        let expr = parse("[1; 2; 3]").unwrap();
-        assert!(expr.is_list());
-        if let Expr::List(elements) = expr {
-            assert_eq!(elements.len(), 3);
-        }
-    }
-
-    #[test]
-    fn test_parse_list_trailing_semicolon() {
-        let expr = parse("[1; 2; 3;]").unwrap();
-        assert!(expr.is_list());
-        if let Expr::List(elements) = expr {
-            assert_eq!(elements.len(), 3);
-        }
-    }
-
-    #[test]
-    fn test_parse_cons() {
-        let expr = parse("1 :: [2; 3]").unwrap();
-        assert!(expr.is_cons());
-    }
-
-    #[test]
-    fn test_parse_cons_nested() {
-        let expr = parse("1 :: 2 :: [3]").unwrap();
-        assert!(expr.is_cons());
-        // Should be right-associative: 1 :: (2 :: [3])
-        if let Expr::Cons { tail, .. } = expr {
-            assert!(tail.is_cons());
-        }
-    }
-
-    // ========================================================================
-    // Array Tests
-    // ========================================================================
-
-    #[test]
-    fn test_parse_array_empty() {
-        let expr = parse("[||]").unwrap();
-        assert!(expr.is_array());
-        if let Expr::Array(elements) = expr {
-            assert_eq!(elements.len(), 0);
-        }
-    }
-
-    #[test]
-    fn test_parse_array_single() {
-        let expr = parse("[|1|]").unwrap();
-        assert!(expr.is_array());
-        if let Expr::Array(elements) = expr {
-            assert_eq!(elements.len(), 1);
-        }
-    }
-
-    #[test]
-    fn test_parse_array_multiple() {
-        let expr = parse("[|1; 2; 3|]").unwrap();
-        assert!(expr.is_array());
-        if let Expr::Array(elements) = expr {
-            assert_eq!(elements.len(), 3);
-        }
-    }
-
-    #[test]
-    fn test_parse_array_trailing_semicolon() {
-        let expr = parse("[|1; 2; 3;|]").unwrap();
-        assert!(expr.is_array());
-        if let Expr::Array(elements) = expr {
-            assert_eq!(elements.len(), 3);
-        }
-    }
-
-    #[test]
-    fn test_parse_array_index() {
-        let expr = parse("arr.[0]").unwrap();
-        assert!(expr.is_array_index());
-    }
-
-    #[test]
-    fn test_parse_array_update() {
-        let expr = parse("arr.[0] <- 99").unwrap();
-        assert!(expr.is_array_update());
-    }
-
-    #[test]
-    fn test_parse_array_length() {
-        let expr = parse("Array.length arr").unwrap();
-        assert!(expr.is_array_length());
-    }
-
-    // ========================================================================
-    // Unary Minus Tests
-    // ========================================================================
-
-    #[test]
-    fn test_parse_unary_minus() {
-        let expr = parse("-42").unwrap();
-        // Unary minus is represented as 0 - expr
-        assert!(matches!(expr, Expr::BinOp { op: BinOp::Sub, .. }));
-    }
-
-    #[test]
-    fn test_parse_unary_minus_var() {
-        let expr = parse("-x").unwrap();
-        assert!(matches!(expr, Expr::BinOp { op: BinOp::Sub, .. }));
-    }
-
-    // ========================================================================
-    // Let Rec Tests
-    // ========================================================================
-
-    #[test]
-    fn test_parse_let_rec_simple() {
-        let source = "let rec f = fun n -> if n <= 1 then 1 else n * f (n - 1) in f 5";
-        let expr = parse(source).unwrap();
-        assert!(expr.is_let_rec());
-    }
-
-    #[test]
-    fn test_parse_let_rec_with_params() {
-        let source = "let rec fact n = if n <= 1 then 1 else n * fact (n - 1) in fact 5";
-        let expr = parse(source).unwrap();
-        assert!(expr.is_let_rec());
-    }
-
-    #[test]
-    fn test_parse_let_rec_no_params() {
-        let source = "let rec x = 42 in x";
-        let expr = parse(source).unwrap();
-        assert!(expr.is_let_rec());
-    }
-
-    #[test]
-    fn test_parse_let_rec_nested() {
-        let source = "let rec f = fun x -> let rec g = fun y -> y + 1 in g x in f 5";
-        let expr = parse(source).unwrap();
-        assert!(expr.is_let_rec());
-    }
-
-    // ========================================================================
-    // Mutual Recursion Tests
-    // ========================================================================
-
-    #[test]
-    fn test_parse_let_rec_mutual_simple() {
-        let source = r#"
-            let rec even n = if n = 0 then true else odd (n - 1)
-            and odd n = if n = 0 then false else even (n - 1)
-            in even 10
-        "#;
-        let expr = parse(source).unwrap();
-        assert!(expr.is_let_rec_mutual());
-        if let Expr::LetRecMutual { bindings, .. } = expr {
-            assert_eq!(bindings.len(), 2);
-        }
-    }
-
-    #[test]
-    fn test_parse_let_rec_mutual_three_functions() {
-        let source = r#"
-            let rec f x = g x
-            and g x = h x
-            and h x = x + 1
-            in f 5
-        "#;
-        let expr = parse(source).unwrap();
-        assert!(expr.is_let_rec_mutual());
-        if let Expr::LetRecMutual { bindings, .. } = expr {
-            assert_eq!(bindings.len(), 3);
-        }
-    }
-
-    #[test]
-    fn test_parse_let_rec_mutual_even_odd() {
-        let source = r#"
-            let rec
-                isEven n = if n = 0 then true else isOdd (n - 1)
-            and isOdd n = if n = 0 then false else isEven (n - 1)
-            in isEven 4
-        "#;
-        let expr = parse(source).unwrap();
-        assert!(expr.is_let_rec_mutual());
-    }
-
-    #[test]
-    fn test_parse_mutual_recursion_complex() {
-        let source = r#"
-            let rec f x y = if x > 0 then g (x - 1) y else y
-            and g x y = if y > 0 then f x (y - 1) else x
-            in f 3 3
-        "#;
-        let expr = parse(source).unwrap();
-        assert!(expr.is_let_rec_mutual());
-    }
-
-    #[test]
-    fn test_parse_recursive_closure() {
-        let source = "let rec f = fun n -> if n <= 1 then 1 else f (n - 1) + f (n - 2) in f 10";
-        let expr = parse(source).unwrap();
-        assert!(expr.is_let_rec());
-    }
-
-    // ========================================================================
-    // Match Expression Tests (Issue #27 Layer 2)
-    // ========================================================================
-
-    #[test]
-    fn test_parse_match_simple() {
-        let source = "match x with | 0 -> \"zero\" | _ -> \"nonzero\"";
-        let expr = parse(source).unwrap();
-        assert!(expr.is_match());
-        let (_, arms) = expr.as_match().unwrap();
-        assert_eq!(arms.len(), 2);
-    }
-
-    #[test]
-    fn test_parse_match_with_wildcard() {
-        let source = "match x with | _ -> 42";
-        let expr = parse(source).unwrap();
-        assert!(expr.is_match());
-        let (_, arms) = expr.as_match().unwrap();
-        assert_eq!(arms.len(), 1);
-        assert!(arms[0].pattern.is_wildcard());
-    }
-
-    #[test]
-    fn test_parse_match_with_var() {
-        let source = "match x with | n -> n + 1";
-        let expr = parse(source).unwrap();
-        assert!(expr.is_match());
-        let (_, arms) = expr.as_match().unwrap();
-        assert_eq!(arms.len(), 1);
-        assert!(arms[0].pattern.is_var());
-    }
-
-    #[test]
-    fn test_parse_match_with_literals() {
-        let source = r#"match x with | 0 -> "zero" | 1 -> "one" | _ -> "many""#;
-        let expr = parse(source).unwrap();
-        assert!(expr.is_match());
-        let (_, arms) = expr.as_match().unwrap();
-        assert_eq!(arms.len(), 3);
-        assert!(arms[0].pattern.is_literal());
-        assert!(arms[1].pattern.is_literal());
-        assert!(arms[2].pattern.is_wildcard());
-    }
-
-    #[test]
-    fn test_parse_match_tuple_pattern() {
-        let source = "match p with | (x, y) -> x + y";
-        let expr = parse(source).unwrap();
-        assert!(expr.is_match());
-        let (_, arms) = expr.as_match().unwrap();
-        assert_eq!(arms.len(), 1);
-        assert!(arms[0].pattern.is_tuple());
-    }
-
-    #[test]
-    fn test_parse_match_tuple_pattern_nested() {
-        let source = "match p with | ((a, b), c) -> a + b + c";
-        let expr = parse(source).unwrap();
-        assert!(expr.is_match());
-        let (_, arms) = expr.as_match().unwrap();
-        assert_eq!(arms.len(), 1);
-        assert!(arms[0].pattern.is_tuple());
-        let tuple_patterns = arms[0].pattern.as_tuple().unwrap();
-        assert_eq!(tuple_patterns.len(), 2);
-        assert!(tuple_patterns[0].is_tuple());
-    }
-
-    #[test]
-    fn test_parse_match_tuple_pattern_with_wildcard() {
-        let source = "match p with | (x, _) -> x";
-        let expr = parse(source).unwrap();
-        assert!(expr.is_match());
-        let (_, arms) = expr.as_match().unwrap();
-        assert_eq!(arms.len(), 1);
-        assert!(arms[0].pattern.is_tuple());
-        let tuple_patterns = arms[0].pattern.as_tuple().unwrap();
-        assert_eq!(tuple_patterns.len(), 2);
-        assert!(tuple_patterns[0].is_var());
-        assert!(tuple_patterns[1].is_wildcard());
-    }
-
-    #[test]
-    fn test_parse_match_bool_pattern() {
-        let source = "match flag with | true -> 1 | false -> 0";
-        let expr = parse(source).unwrap();
-        assert!(expr.is_match());
-        let (_, arms) = expr.as_match().unwrap();
-        assert_eq!(arms.len(), 2);
-        assert!(arms[0].pattern.is_literal());
-        assert!(arms[1].pattern.is_literal());
-    }
-
-    #[test]
-    fn test_parse_match_string_pattern() {
-        let source = r#"match s with | "hello" -> 1 | _ -> 0"#;
-        let expr = parse(source).unwrap();
-        assert!(expr.is_match());
-        let (_, arms) = expr.as_match().unwrap();
-        assert_eq!(arms.len(), 2);
-        assert!(arms[0].pattern.is_literal());
-    }
-
-    #[test]
-    fn test_parse_match_nested() {
-        let source = "match x with | 0 -> (match y with | 0 -> 1 | _ -> 2) | _ -> 3";
-        let expr = parse(source).unwrap();
-        assert!(expr.is_match());
-        let (_, arms) = expr.as_match().unwrap();
-        assert_eq!(arms.len(), 2);
-        assert!(arms[0].body.is_match());
-    }
-
-    #[test]
-    fn test_parse_match_complex_body() {
-        let source = "match n with | 0 -> if true then 1 else 2 | _ -> 3";
-        let expr = parse(source).unwrap();
-        assert!(expr.is_match());
-        let (_, arms) = expr.as_match().unwrap();
-        assert_eq!(arms.len(), 2);
-        assert!(arms[0].body.is_if());
-    }
-
-    #[test]
-    fn test_parse_match_multiple_arms() {
-        let source =
-            "match n with | 0 -> \"a\" | 1 -> \"b\" | 2 -> \"c\" | 3 -> \"d\" | _ -> \"e\"";
-        let expr = parse(source).unwrap();
-        assert!(expr.is_match());
-        let (_, arms) = expr.as_match().unwrap();
-        assert_eq!(arms.len(), 5);
-    }
-
-    #[test]
-    fn test_parse_match_empty_tuple_pattern() {
-        let source = "match unit with | () -> 42";
-        let expr = parse(source).unwrap();
-        assert!(expr.is_match());
-        let (_, arms) = expr.as_match().unwrap();
-        assert_eq!(arms.len(), 1);
-        assert!(arms[0].pattern.is_tuple());
-        assert_eq!(arms[0].pattern.as_tuple().unwrap().len(), 0);
-    }
-
-    #[test]
-    fn test_parse_match_grouped_pattern() {
-        let source = "match x with | (n) -> n + 1";
-        let expr = parse(source).unwrap();
-        assert!(expr.is_match());
-        let (_, arms) = expr.as_match().unwrap();
-        assert_eq!(arms.len(), 1);
-        // Grouped pattern (n) is just n
-        assert!(arms[0].pattern.is_var());
-    }
-
-    #[test]
-    fn test_parse_match_mixed_patterns() {
-        let source = "match data with | 0 -> \"zero\" | x -> \"var\" | _ -> \"wild\"";
-        let expr = parse(source).unwrap();
-        assert!(expr.is_match());
-        let (_, arms) = expr.as_match().unwrap();
-        assert_eq!(arms.len(), 3);
-        assert!(arms[0].pattern.is_literal());
-        assert!(arms[1].pattern.is_var());
-        assert!(arms[2].pattern.is_wildcard());
-    }
-
-    #[test]
-    fn test_parse_match_tuple_triple() {
-        let source = "match triple with | (a, b, c) -> a + b + c";
-        let expr = parse(source).unwrap();
-        assert!(expr.is_match());
-        let (_, arms) = expr.as_match().unwrap();
-        assert_eq!(arms.len(), 1);
-        assert!(arms[0].pattern.is_tuple());
-        assert_eq!(arms[0].pattern.as_tuple().unwrap().len(), 3);
-    }
-
-    #[test]
-    fn test_parse_match_with_arithmetic_in_body() {
-        let source = "match n with | 0 -> 1 + 2 * 3 | _ -> 4 - 5";
-        let expr = parse(source).unwrap();
-        assert!(expr.is_match());
-        let (_, arms) = expr.as_match().unwrap();
-        assert_eq!(arms.len(), 2);
-        assert!(arms[0].body.is_binop());
-        assert!(arms[1].body.is_binop());
-    }
-
-    #[test]
-    fn test_parse_match_in_complex_expression() {
-        let source = "let f = fun x -> 1 + (match x with | 0 -> 10 | _ -> 20) in f 5";
-        let expr = parse(source).unwrap();
-        assert!(expr.is_let());
-    }
-
-    // Error cases
-    #[test]
-    fn test_parse_match_missing_with() {
-        let source = "match x | 0 -> 1";
-        let result = parse(source);
-        assert!(result.is_err());
-    }
-
-    #[test]
-    fn test_parse_match_missing_pipe() {
-        let source = "match x with 0 -> 1";
-        let result = parse(source);
-        assert!(result.is_err());
-    }
-
-    #[test]
-    fn test_parse_match_missing_arrow() {
-        let source = "match x with | 0 1";
-        let result = parse(source);
-        assert!(result.is_err());
-    }
-
-    #[test]
-    fn test_parse_pattern_invalid() {
-        let source = "match x with | -> 1";
-        let result = parse(source);
-        assert!(result.is_err());
-    }
-
-    #[test]
-    fn test_parse_match_empty_arms() {
-        let source = "match x with";
-        let result = parse(source);
-        assert!(result.is_err());
-    }
-
-    #[test]
-    fn test_parse_match_tuple_pattern_nested_complex() {
-        let source = "match quad with | ((a, b), (c, d)) -> a + b + c + d";
-        let expr = parse(source).unwrap();
-        assert!(expr.is_match());
-        let (_, arms) = expr.as_match().unwrap();
-        assert_eq!(arms.len(), 1);
-        assert!(arms[0].pattern.is_tuple());
-        let tuple_patterns = arms[0].pattern.as_tuple().unwrap();
-        assert_eq!(tuple_patterns.len(), 2);
-        assert!(tuple_patterns[0].is_tuple());
-        assert!(tuple_patterns[1].is_tuple());
-    }
-
-    #[test]
-    fn test_parse_match_real_world_example() {
-        let source = r#"
-            let classify_point = fun p ->
-                match p with
-                | (0, 0) -> "origin"
-                | (0, _) -> "y-axis"
-                | (_, 0) -> "x-axis"
-                | (x, y) -> "quadrant"
-            in classify_point (1, 2)
-        "#;
-        let expr = parse(source).unwrap();
-        assert!(expr.is_let());
-    }
-
-    #[test]
-    fn test_parse_match_fibonacci_style() {
-        let source = r#"
-            let rec fib = fun n ->
-                match n with
-                | 0 -> 0
-                | 1 -> 1
-                | n -> fib (n - 1) + fib (n - 2)
-            in fib 10
-        "#;
-        let expr = parse(source).unwrap();
-        assert!(expr.is_let_rec());
-    }
-
-    #[test]
-    fn test_parse_match_with_let_in_body() {
-        let source = "match x with | 0 -> let y = 1 in y | _ -> 2";
-        let expr = parse(source).unwrap();
-        assert!(expr.is_match());
-        let (_, arms) = expr.as_match().unwrap();
-        assert_eq!(arms.len(), 2);
-        assert!(arms[0].body.is_let());
-    }
-
-    #[test]
-    fn test_parse_match_with_lambda_in_body() {
-        let expr = parse("match x with | 0 -> fun y -> y + 1 | _ -> fun y -> y").unwrap();
-        assert!(expr.is_match());
-        let (_, arms) = expr.as_match().unwrap();
-        assert_eq!(arms.len(), 2);
-        assert!(arms[0].body.is_lambda());
-        assert!(arms[1].body.is_lambda());
-    }
-
-    #[test]
-    fn test_parse_match_single_arm() {
-        let expr = parse("match x with | n -> n").unwrap();
-        assert!(expr.is_match());
-        let (_, arms) = expr.as_match().unwrap();
-        assert_eq!(arms.len(), 1);
-        assert!(arms[0].pattern.is_var());
-    }
-
-    #[test]
-    fn test_parse_match_tuple_single_element() {
-        let expr = parse("match pair with | (x,) -> x").unwrap();
-        assert!(expr.is_match());
-        let (_, arms) = expr.as_match().unwrap();
-        assert_eq!(arms.len(), 1);
-        assert!(arms[0].pattern.is_tuple());
-        let tuple_patterns = arms[0].pattern.as_tuple().unwrap();
-        assert_eq!(tuple_patterns.len(), 1);
-    }
-
-    // ========================================================================
-    // Record Update Tests
-    // ========================================================================
-
-    #[test]
-    fn test_parse_record_update_simple() {
-        let source = "{ person with age = 31 }";
-        let expr = parse(source).unwrap();
-        assert!(expr.is_record_update());
-        if let Expr::RecordUpdate { record, fields } = expr {
-            assert!(matches!(*record, Expr::Var(_)));
-            assert_eq!(fields.len(), 1);
-            assert_eq!(fields[0].0, "age");
-        }
-    }
-
-    #[test]
-    fn test_parse_record_update_multiple_fields() {
-        let source = "{ person with age = 31; city = \"NYC\" }";
-        let expr = parse(source).unwrap();
-        assert!(expr.is_record_update());
-        if let Expr::RecordUpdate { fields, .. } = expr {
-            assert_eq!(fields.len(), 2);
-        }
-    }
-
-    #[test]
-    fn test_parse_record_literal_vs_update() {
-        // Test that we can distinguish record literal from update
-        let literal = parse("{ name = \"John\"; age = 30 }").unwrap();
-        assert!(literal.is_record_literal());
-        assert!(!literal.is_record_update());
-
-        let update = parse("{ person with age = 31 }").unwrap();
-        assert!(update.is_record_update());
-        assert!(!update.is_record_literal());
+    fn test_parse_lambda() {
+        let expr = parse_str("fun x -> x").unwrap();
+        assert!(expr.is_lambda());
     }
 }

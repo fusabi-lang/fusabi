@@ -250,7 +250,7 @@ impl Compiler {
     /// 3. Compile the main expression (if present)
     pub fn compile_program(program: &Program) -> CompileResult<Chunk> {
         let mut compiler = Compiler::new();
-        let mut registry = ModuleRegistry::new();
+        let mut registry = ModuleRegistry::with_stdlib();
 
         // Phase 1: Register all modules
         for module in &program.modules {
@@ -445,7 +445,6 @@ impl Compiler {
         self.emit(Instruction::LoadConst(idx));
         Ok(())
     }
-
     /// Compile a variable reference with module support
     ///
     /// This handles:
@@ -469,7 +468,15 @@ impl Compiler {
 
         // Check imported bindings
         if let Some(expr) = self.imported_bindings.get(name) {
-            // Compile the imported expression directly
+            // For imported bindings, check if the expression is a simple variable reference
+            // (which indicates a global/stdlib reference). If so, compile it directly as
+            // a global lookup to avoid infinite recursion.
+            if let Expr::Var(ref global_name) = expr {
+                let idx = self.add_constant(Value::Str(global_name.clone()))?;
+                self.emit(Instruction::LoadGlobal(idx));
+                return Ok(());
+            }
+            // For other expressions (e.g., user-defined module bindings), compile normally
             return self.compile_expr(&expr.clone());
         }
 
@@ -498,10 +505,18 @@ impl Compiler {
             .resolve_qualified(module_name, name)
             .ok_or_else(|| CompileError::UndefinedVariable(format!("{}.{}", module_name, name)))?;
 
-        // Compile the looked-up expression
+        // For stdlib modules, the expression will be Expr::Var("Module.function")
+        // which represents a global reference. Compile it directly as global lookup
+        // to avoid infinite recursion.
+        if let Expr::Var(ref global_name) = expr {
+            let idx = self.add_constant(Value::Str(global_name.clone()))?;
+            self.emit(Instruction::LoadGlobal(idx));
+            return Ok(());
+        }
+
+        // For user-defined modules, compile the expression normally
         self.compile_expr(&expr.clone())
     }
-
     /// Compile a binary operation
     fn compile_binop(&mut self, op: BinOp, left: &Expr, right: &Expr) -> CompileResult<()> {
         // Compile operands

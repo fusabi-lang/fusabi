@@ -544,7 +544,8 @@ fn test_parse_du_missing_eq() {
 
 #[test]
 fn test_parse_du_missing_variant_name() {
-    let result = parse_du_typedef("type Option = | None");
+    // This should fail because there's a pipe with nothing after it
+    let result = parse_du_typedef("type Option = |");
     assert!(result.is_err());
 }
 

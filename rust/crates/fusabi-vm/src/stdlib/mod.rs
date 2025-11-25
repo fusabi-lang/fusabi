@@ -1,7 +1,8 @@
 // Fusabi Standard Library
-// Provides built-in functions for List, String, and Option operations
+// Provides built-in functions for List, String, Map, and Option operations
 
 pub mod list;
+pub mod map;
 pub mod option;
 pub mod string;
 
@@ -66,6 +67,38 @@ pub fn register_stdlib(vm: &mut Vm) {
             wrap_binary(args, string::string_ends_with)
         });
 
+        // Map functions
+        registry.register("Map.empty", |_vm, args| {
+            wrap_unary(args, map::map_empty)
+        });
+        registry.register("Map.add", |_vm, args| {
+            wrap_ternary(args, map::map_add)
+        });
+        registry.register("Map.remove", |_vm, args| {
+            wrap_binary(args, map::map_remove)
+        });
+        registry.register("Map.find", |_vm, args| {
+            wrap_binary(args, map::map_find)
+        });
+        registry.register("Map.tryFind", |_vm, args| {
+            wrap_binary(args, map::map_try_find)
+        });
+        registry.register("Map.containsKey", |_vm, args| {
+            wrap_binary(args, map::map_contains_key)
+        });
+        registry.register("Map.isEmpty", |_vm, args| {
+            wrap_unary(args, map::map_is_empty)
+        });
+        registry.register("Map.count", |_vm, args| {
+            wrap_unary(args, map::map_count)
+        });
+        registry.register("Map.ofList", |_vm, args| {
+            wrap_unary(args, map::map_of_list)
+        });
+        registry.register("Map.toList", |_vm, args| {
+            wrap_unary(args, map::map_to_list)
+        });
+
         // Option functions
         registry.register("Option.isSome", |_vm, args| {
             wrap_unary(args, option::option_is_some)
@@ -118,6 +151,23 @@ pub fn register_stdlib(vm: &mut Vm) {
         Value::Record(Rc::new(RefCell::new(string_fields))),
     );
 
+    // Map Module
+    let mut map_fields = HashMap::new();
+    map_fields.insert("empty".to_string(), native("Map.empty", 1));
+    map_fields.insert("add".to_string(), native("Map.add", 3));
+    map_fields.insert("remove".to_string(), native("Map.remove", 2));
+    map_fields.insert("find".to_string(), native("Map.find", 2));
+    map_fields.insert("tryFind".to_string(), native("Map.tryFind", 2));
+    map_fields.insert("containsKey".to_string(), native("Map.containsKey", 2));
+    map_fields.insert("isEmpty".to_string(), native("Map.isEmpty", 1));
+    map_fields.insert("count".to_string(), native("Map.count", 1));
+    map_fields.insert("ofList".to_string(), native("Map.ofList", 1));
+    map_fields.insert("toList".to_string(), native("Map.toList", 1));
+    vm.globals.insert(
+        "Map".to_string(),
+        Value::Record(Rc::new(RefCell::new(map_fields))),
+    );
+
     // Option Module
     let mut option_fields = HashMap::new();
     option_fields.insert("isSome".to_string(), native("Option.isSome", 1));
@@ -163,6 +213,19 @@ where
         )));
     }
     f(&args[0], &args[1])
+}
+
+fn wrap_ternary<F>(args: &[Value], f: F) -> Result<Value, VmError>
+where
+    F: Fn(&Value, &Value, &Value) -> Result<Value, VmError>,
+{
+    if args.len() != 3 {
+        return Err(VmError::Runtime(format!(
+            "Expected 3 arguments, got {}",
+            args.len()
+        )));
+    }
+    f(&args[0], &args[1], &args[2])
 }
 
 #[cfg(test)]

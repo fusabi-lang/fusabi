@@ -113,6 +113,9 @@ pub enum Value {
     /// Record with field name -> value mapping
     /// Records are immutable - updates create new instances
     Record(Rc<RefCell<HashMap<String, Value>>>),
+    /// Map with string keys and value mapping
+    /// Maps are immutable - updates create new instances
+    Map(Rc<RefCell<HashMap<String, Value>>>),
     /// Discriminated union variant value
     /// Contains: type_name, variant_name, field values
     Variant {
@@ -150,6 +153,7 @@ impl Value {
             Value::Nil => "list",
             Value::Array(_) => "array",
             Value::Record(_) => "record",
+            Value::Map(_) => "map",
             Value::Variant { .. } => "variant",
             Value::Closure(_) => "function",
             Value::NativeFn { .. } => "function",
@@ -237,6 +241,7 @@ impl Value {
             Value::Nil => false,
             Value::Array(arr) => !arr.borrow().is_empty(),
             Value::Record(fields) => !fields.borrow().is_empty(),
+            Value::Map(map) => !map.borrow().is_empty(),
             Value::Variant { .. } => true,
             Value::Closure(_) => true,
             Value::NativeFn { .. } => true,
@@ -597,6 +602,20 @@ impl fmt::Display for Value {
                     write!(f, "{} = {}", field_name, field_value)?;
                 }
                 write!(f, " }}")
+            }
+            Value::Map(map) => {
+                // Pretty-print as Map [ key1 -> value1; key2 -> value2 ]
+                write!(f, "Map [")?;
+                let map = map.borrow();
+                let mut sorted_entries: Vec<_> = map.iter().collect();
+                sorted_entries.sort_by_key(|(k, _)| *k);
+                for (i, (key, value)) in sorted_entries.iter().enumerate() {
+                    if i > 0 {
+                        write!(f, "; ")?;
+                    }
+                    write!(f, "{} -> {}", key, value)?;
+                }
+                write!(f, "]")
             }
             Value::Variant {
                 variant_name,

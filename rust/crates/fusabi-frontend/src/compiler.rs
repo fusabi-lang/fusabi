@@ -218,10 +218,11 @@ impl Compiler {
     /// Compile a complete program with modules
     ///
     /// This is the main entry point for compiling programs with module definitions.
-    /// It performs three phases:
+    /// It performs four phases:
     /// 1. Register all modules and their bindings
     /// 2. Apply imports to the current environment
-    /// 3. Compile the main expression (if present)
+    /// 3. Compile top-level items (Let bindings)
+    /// 4. Compile the main expression (if present)
     pub fn compile_program(program: &Program) -> CompileResult<Chunk> {
         let mut compiler = Compiler::new();
         let mut registry = ModuleRegistry::new();
@@ -239,11 +240,53 @@ impl Compiler {
             compiler.apply_import(import)?;
         }
 
-        // Phase 3: Compile main expression (if present)
+        // Phase 3: Compile top-level items (Let bindings)
+        for item in &program.items {
+            match item {
+                ModuleItem::Let(name, expr) => {
+                    // Compile the value expression
+                    compiler.compile_expr(expr)?;
+                    
+                    // Add local variable to scope (global scope for this chunk)
+                    compiler.add_local(name.clone())?;
+                    let local_idx = (compiler.locals.len() - 1) as u8;
+                    
+                    // Store value in local slot
+                    compiler.emit(Instruction::StoreLocal(local_idx));
+                }
+                ModuleItem::LetRec(bindings) => {
+                    // 1. Push placeholders
+                    let placeholder_idx = compiler.add_constant(Value::Unit)?;
+                    let mut local_indices = Vec::new();
+
+                    for (name, _) in bindings {
+                        compiler.emit(Instruction::LoadConst(placeholder_idx));
+                        compiler.add_local(name.clone())?;
+                        let local_idx = (compiler.locals.len() - 1) as u8;
+                        local_indices.push(local_idx);
+                        compiler.emit(Instruction::StoreLocal(local_idx));
+                    }
+
+                    // 2. Compile values and update locals
+                    for (i, (_, value)) in bindings.iter().enumerate() {
+                        compiler.compile_expr(value)?;
+                        compiler.emit(Instruction::StoreLocal(local_indices[i]));
+                    }
+                }
+                ModuleItem::TypeDef(_type_def) => {
+                    // Type definitions don't generate code in Phase 1/2
+                }
+                ModuleItem::Module(_) => {
+                    // Nested modules in items are not yet supported at top-level
+                }
+            }
+        }
+
+        // Phase 4: Compile main expression (if present)
         if let Some(main_expr) = &program.main_expr {
             compiler.compile_expr(main_expr)?;
         } else {
-            // No main expression, just return Unit
+            // No main expression, return Unit
             let unit_idx = compiler.add_constant(Value::Unit)?;
             compiler.emit(Instruction::LoadConst(unit_idx));
         }
@@ -611,6 +654,7 @@ impl Compiler {
     }
 
     fn compile_let(&mut self, name: &str, value: &Expr, body: &Expr) -> CompileResult<()> {
+        // println!("DEBUG: compiling top-level let {}", name);
         // Compile the value expression
         self.compile_expr(value)?;
 

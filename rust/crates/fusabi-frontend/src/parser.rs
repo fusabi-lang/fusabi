@@ -21,7 +21,7 @@
 //! - Modules: `module Math = ...`, `open Math`
 //! - Proper operator precedence
 //! - Error recovery and reporting
-//!
+//! 
 //! module     ::= declaration*
 //! declaration::= type_def | let_binding
 //! type_def   ::= "type" IDENT "=" "{" (IDENT ":" type_expr (";" IDENT ":" type_expr)* ";"?)? "}"
@@ -31,10 +31,10 @@
 //! simple_type::= IDENT
 //! let_binding::= "let" IDENT IDENT* "=" expr
 //! # Grammar (Simplified)
-//!
+//! 
 //! ```text
 //! program    ::= import* module_def* expr?
-//! import     ::= "open" IDENT ("." IDENT)*
+//! import     ::= "open" IDENT ("|" IDENT)*
 //! module_def ::= "module" IDENT "=" module_item*
 //! module_item::= let_binding | type_def | module_def
 //! expr       ::= let_expr | if_expr | lambda_expr | or_expr
@@ -51,26 +51,26 @@
 //! app_expr   ::= postfix_expr (postfix_expr)*
 //! postfix_expr ::= primary (".[" expr "]" ("<-" expr)?)*
 //! primary    ::= INT | FLOAT | BOOL | STRING | IDENT | "(" expr ")" | tuple | list | array | "Array.length" primary | variant_construct
-//! tuple      ::= "(" ")" | "(" expr ("," expr)* ","? ")"
-//! list       ::= "[" "]" | "[" expr (";" expr)* ";"? "]"
-//! array      ::= "[|" "]" | "[|" expr (";" expr)* ";"? "|]"
+//! tuple      ::= "()" | "(" expr ( R"," expr)* ","? ")"
+//! list       ::= "[]" | "[" expr (";" expr)* ";"? "]"
+//! array      ::= "[|" "|]" | "[|" expr (";" expr)* ";"? "|]"
 //! record_literal ::= "{" (IDENT "=" expr (";" IDENT "=" expr)* ";"?)? "}"
 //! record_update  ::= "{" expr "with" IDENT "=" expr (";" IDENT "=" expr)* ";"? "}"
-//! variant_construct ::= IDENT ("(" expr ("," expr)* ")")?
+//! variant_construct ::= IDENT ("(" expr ( R"," expr)* ")")?
 //! ```
-//!
+//! 
 //! # Example
-//!
+//! 
 //! ```rust
 //! use fusabi_frontend::parser::Parser;
 //! use fusabi_frontend::lexer::Lexer;
 //! use fusabi_frontend::ast::{Expr, Literal, BinOp};
-//!
+//! 
 //! let mut lexer = Lexer::new("let x = 42 in x + 1");
 //! let tokens = lexer.tokenize().unwrap();
 //! let mut parser = Parser::new(tokens);
 //! let ast = parser.parse().unwrap();
-//!
+//! 
 //! // AST represents: let x = 42 in (x + 1)
 //! assert!(ast.is_let());
 //! ```
@@ -163,18 +163,72 @@ impl Parser {
     /// Parse a complete program with modules, imports, and main expression.
     ///
     /// This is the new entry point for parsing programs with module system support.
+    /// It now supports top-level let bindings and type definitions interspersed
+    /// with module definitions.
     pub fn parse_program(&mut self) -> Result<Program> {
         let mut imports = vec![];
         let mut modules = vec![];
+        let mut items = vec![];
 
-        // Parse imports first
+        // Parse items until we hit EOF or a token that starts the main expression
+        // We assume imports come first for simplicity, but we could relax this.
         while self.peek() == Some(&Token::Open) {
             imports.push(self.parse_import()?);
         }
 
-        // Parse module definitions
-        while self.peek() == Some(&Token::Module) {
-            modules.push(self.parse_module()?);
+        loop {
+            if self.is_at_end() {
+                break;
+            }
+
+            let tok = self.peek();
+            
+            if tok == Some(&Token::Module) {
+                let module = self.parse_module()?;
+                modules.push(module);
+            } else if tok == Some(&Token::Type) {
+                let type_def = self.parse_type_def()?;
+                items.push(ModuleItem::TypeDef(type_def));
+            } else if tok == Some(&Token::Let) {
+                // Check for `let x = expr` (binding) vs `let x = expr in body` (expression)
+                
+                let save_pos = self.pos; // Save position to potentially restart as expression
+                
+                match self.parse_let_binding_parts() {
+                    Ok((name, val)) => {
+                        // Check if next token is `in`
+                        if self.match_token(&Token::In) {
+                            // It's `let ... in ...` - an expression.
+                            // Consume `in`, parse body.
+                            let body = self.parse_expr()?;
+                            
+                            let expr = Expr::Let {
+                                name,
+                                value: Box::new(val),
+                                body: Box::new(body),
+                            };
+                            
+                            return Ok(Program {
+                                modules,
+                                imports,
+                                items,
+                                main_expr: Some(expr),
+                            });
+                        } else {
+                            // It's a top-level binding `let name = val` (no `in`)
+                            items.push(ModuleItem::Let(name, val));
+                        }
+                    },
+                    Err(_) => {
+                        // Failed to parse as binding parts - assume start of main expression
+                        self.pos = save_pos;
+                        break;
+                    }
+                }
+            } else {
+                // Not Module, Type, or Let -> Start of main expression
+                break;
+            }
         }
 
         // Parse main expression (if any)
@@ -187,6 +241,7 @@ impl Parser {
         Ok(Program {
             modules,
             imports,
+            items,
             main_expr,
         })
     }
@@ -319,13 +374,13 @@ impl Parser {
             params.push(self.expect_ident()?);
         }
 
-        // Expect '='
+        // Expect "="
         self.expect_token(Token::Eq)?;
 
         // Parse value expression
         let value = self.parse_expr()?;
 
-        // Expect 'in'
+        // Expect "in"
         self.expect_token(Token::In)?;
 
         // Parse body expression
@@ -362,7 +417,7 @@ impl Parser {
             params.push(self.expect_ident()?);
         }
 
-        // Expect '='
+        // Expect "="
         self.expect_token(Token::Eq)?;
 
         // Parse value expression
@@ -381,7 +436,7 @@ impl Parser {
                 })
         };
 
-        // Check for 'and' keyword (mutually recursive bindings)
+        // Check for "and" keyword (mutually recursive bindings)
         if self.match_token(&Token::AndKeyword) {
             let mut bindings = vec![(first_name, first_value)];
 
@@ -395,7 +450,7 @@ impl Parser {
                     params.push(self.expect_ident()?);
                 }
 
-                // Expect '='
+                // Expect "="
                 self.expect_token(Token::Eq)?;
 
                 // Parse value expression
@@ -416,13 +471,13 @@ impl Parser {
 
                 bindings.push((name, value));
 
-                // Check for another 'and'
+                // Check for another "and"
                 if !self.match_token(&Token::AndKeyword) {
                     break;
                 }
             }
 
-            // Expect 'in'
+            // Expect "in"
             self.expect_token(Token::In)?;
 
             // Parse body
@@ -434,7 +489,7 @@ impl Parser {
             })
         } else {
             // Single recursive binding
-            // Expect 'in'
+            // Expect "in"
             self.expect_token(Token::In)?;
 
             // Parse body
@@ -507,7 +562,7 @@ impl Parser {
         // Parse scrutinee
         let scrutinee = Box::new(self.parse_expr()?);
 
-        // Expect 'with'
+        // Expect "with"
         self.expect_token(Token::With)?;
 
         // Parse arms (at least one required)
@@ -551,7 +606,7 @@ impl Parser {
         let mut expr = self.parse_or_expr()?;
 
         while self.match_token(&Token::PipeRight) {
-            let func_expr = self.parse_app_expr()?; // The function to pipe into
+            let func_expr = self.parse_app_expr()?;
             
             // Desugar: expr |> func_expr  =>  func_expr expr
             expr = Expr::App {
@@ -634,7 +689,7 @@ impl Parser {
             }
             // Tuple or grouped pattern: (p1, p2, ...) or (p)
             Token::LParen => {
-                self.advance(); // consume '('
+                self.advance(); // consume "("
 
                 // Empty tuple: ()
                 if self.match_token(&Token::RParen) {
@@ -905,7 +960,7 @@ impl Parser {
                         // No semicolon and no closing brace - error
                         let tok = self.current_token();
                         return Err(ParseError::UnexpectedToken {
-                            expected: "';' or '}'".to_string(),
+                            expected: ";' or '}'".to_string(),
                             found: tok.token.clone(),
                             pos: tok.pos,
                         });
@@ -944,7 +999,7 @@ impl Parser {
                 // No semicolon and no closing brace - error
                 let tok = self.current_token();
                 return Err(ParseError::UnexpectedToken {
-                    expected: "';' or '}'".to_string(),
+                    expected: ";' or '}'".to_string(),
                     found: tok.token.clone(),
                     pos: tok.pos,
                 });
@@ -1050,7 +1105,7 @@ impl Parser {
                 // Check if this could be a variant constructor
                 // Use uppercase heuristic: if identifier starts with uppercase, it's likely a variant
                 // Exception: if followed by '.', it's likely a module access (e.g. String.length)
-                if (Self::is_uppercase_ident(&val) && !self.check(&Token::Dot))
+                if (Self::is_uppercase_ident(&val) && !self.check(&Token::Dot)) 
                     || matches!(self.current_token().token, Token::LParen)
                 {
                     // This looks like a variant constructor
@@ -1061,7 +1116,7 @@ impl Parser {
                 }
             }
             Token::LParen => {
-                self.advance(); // consume '('
+                self.advance(); // consume "("
 
                 // Handle empty tuple/unit: ()
                 if self.match_token(&Token::RParen) {
@@ -1103,7 +1158,7 @@ impl Parser {
                 }
             }
             Token::LBracket => {
-                self.advance(); // consume '['
+                self.advance(); // consume "["
 
                 let mut elements = vec![];
 
@@ -1128,7 +1183,7 @@ impl Parser {
                 Ok(Expr::List(elements))
             }
             Token::LBracketPipe => {
-                self.advance(); // consume '[|'
+                self.advance(); // consume "[|"
                 let mut elements = vec![];
 
                 // Empty array: [||]
@@ -1241,7 +1296,7 @@ impl Parser {
         // Parse type name
         let name = self.expect_ident()?;
 
-        // Expect '='
+        // Expect "="
         self.expect_token(Token::Eq)?;
 
         // Parse variants separated by |
@@ -1504,8 +1559,8 @@ mod tests {
 
     #[test]
     fn test_parse_simple_module() {
-        let source = r#"
-            module Math =
+        let source = r#" 
+            module Math = 
                 let add x y = x + y
                 let multiply x y = x * y
         "#;
@@ -1535,7 +1590,7 @@ mod tests {
 
     #[test]
     fn test_parse_import_simple() {
-        let source = r#"
+        let source = r#" 
             open Math
 
             add 5 10
@@ -1560,8 +1615,8 @@ mod tests {
 
     #[test]
     fn test_parse_module_with_function() {
-        let source = r#"
-            module Utils =
+        let source = r#" 
+            module Utils = 
                 let identity x = x
                 let const x y = x
         "#;
@@ -1574,12 +1629,12 @@ mod tests {
 
     #[test]
     fn test_parse_complete_program() {
-        let source = r#"
-            module Math =
+        let source = r#" 
+            module Math = 
                 let add x y = x + y
                 let multiply x y = x * y
 
-            module Utils =
+            module Utils = 
                 let identity x = x
         "#;
 
@@ -1592,11 +1647,11 @@ mod tests {
 
     #[test]
     fn test_parse_program_modules_only() {
-        let source = r#"
-            module A =
+        let source = r#" 
+            module A = 
                 let x = 1
 
-            module B =
+            module B = 
                 let y = 2
         "#;
 
@@ -1609,7 +1664,7 @@ mod tests {
 
     #[test]
     fn test_parse_program_imports_and_expr() {
-        let source = r#"
+        let source = r#" 
             open Math
             open Utils
 
@@ -1777,8 +1832,7 @@ mod tests {
             op: BinOp::Add,
             left,
             right,
-        } = expr
-        {
+        } = expr {
             assert_eq!(*left, Expr::Lit(Literal::Int(1)));
             assert!(matches!(*right, Expr::BinOp { op: BinOp::Mul, .. }));
         } else {
@@ -1794,8 +1848,7 @@ mod tests {
             op: BinOp::Add,
             left,
             right,
-        } = expr
-        {
+        } = expr {
             assert!(matches!(*left, Expr::BinOp { op: BinOp::Mul, .. }));
             assert_eq!(*right, Expr::Lit(Literal::Int(1)));
         } else {
@@ -1818,8 +1871,7 @@ mod tests {
             op: BinOp::Or,
             left,
             right,
-        } = expr
-        {
+        } = expr {
             assert_eq!(*left, Expr::Var("a".to_string()));
             assert!(matches!(*right, Expr::BinOp { op: BinOp::And, .. }));
         } else {
@@ -1895,8 +1947,7 @@ mod tests {
             if let Expr::Lambda {
                 param: inner_param,
                 body: inner_body,
-            } = *body
-            {
+            } = *body {
                 assert_eq!(inner_param, "y");
                 assert!(inner_body.is_binop());
             }
@@ -2187,7 +2238,7 @@ mod tests {
 
     #[test]
     fn test_parse_let_rec_mutual_simple() {
-        let source = r#"
+        let source = r#" 
             let rec even n = if n = 0 then true else odd (n - 1)
             and odd n = if n = 0 then false else even (n - 1)
             in even 10
@@ -2201,7 +2252,7 @@ mod tests {
 
     #[test]
     fn test_parse_let_rec_mutual_three_functions() {
-        let source = r#"
+        let source = r#" 
             let rec f x = g x
             and g x = h x
             and h x = x + 1
@@ -2216,7 +2267,7 @@ mod tests {
 
     #[test]
     fn test_parse_let_rec_mutual_even_odd() {
-        let source = r#"
+        let source = r#" 
             let rec
                 isEven n = if n = 0 then true else isOdd (n - 1)
             and isOdd n = if n = 0 then false else isEven (n - 1)
@@ -2228,7 +2279,7 @@ mod tests {
 
     #[test]
     fn test_parse_mutual_recursion_complex() {
-        let source = r#"
+        let source = r#" 
             let rec f x y = if x > 0 then g (x - 1) y else y
             and g x y = if y > 0 then f x (y - 1) else x
             in f 3 3
@@ -2279,7 +2330,7 @@ mod tests {
 
     #[test]
     fn test_parse_match_with_literals() {
-        let source = r#"match x with | 0 -> "zero" | 1 -> "one" | _ -> "many""#;
+        let source = r###"match x with | 0 -> "zero" | 1 -> "one" | _ -> "many""###;
         let expr = parse(source).unwrap();
         assert!(expr.is_match());
         let (_, arms) = expr.as_match().unwrap();
@@ -2339,7 +2390,7 @@ mod tests {
 
     #[test]
     fn test_parse_match_string_pattern() {
-        let source = r#"match s with | "hello" -> 1 | _ -> 0"#;
+        let source = r###"match s with | "hello" -> 1 | _ -> 0"###;
         let expr = parse(source).unwrap();
         assert!(expr.is_match());
         let (_, arms) = expr.as_match().unwrap();
@@ -2492,7 +2543,7 @@ mod tests {
 
     #[test]
     fn test_parse_match_real_world_example() {
-        let source = r#"
+        let source = r###" 
             let classify_point = fun p ->
                 match p with
                 | (0, 0) -> "origin"
@@ -2500,21 +2551,21 @@ mod tests {
                 | (_, 0) -> "x-axis"
                 | (x, y) -> "quadrant"
             in classify_point (1, 2)
-        "#;
+        "###;
         let expr = parse(source).unwrap();
         assert!(expr.is_let());
     }
 
     #[test]
     fn test_parse_match_fibonacci_style() {
-        let source = r#"
+        let source = r###" 
             let rec fib = fun n ->
                 match n with
                 | 0 -> 0
                 | 1 -> 1
                 | n -> fib (n - 1) + fib (n - 2)
             in fib 10
-        "#;
+        "###;
         let expr = parse(source).unwrap();
         assert!(expr.is_let_rec());
     }

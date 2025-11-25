@@ -1033,10 +1033,13 @@ impl fmt::Display for Import {
 /// module definitions, imports, and an optional main expression.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Program {
-    /// Module definitions
-    pub modules: Vec<ModuleDef>,
     /// Import statements
     pub imports: Vec<Import>,
+    /// Top-level items (Modules, Let bindings, Type definitions)
+    pub items: Vec<ModuleItem>,
+    /// Explicit named modules (kept for backward compatibility / specific module parsing)
+    /// In new parser logic, modules can also be in `items`.
+    pub modules: Vec<ModuleDef>, 
     /// Main expression to evaluate (if any)
     pub main_expr: Option<Expr>,
 }
@@ -1046,21 +1049,18 @@ impl fmt::Display for Program {
         for import in &self.imports {
             writeln!(f, "{}", import)?;
         }
-        if !self.imports.is_empty() && !self.modules.is_empty() {
+        if !self.imports.is_empty() && (!self.modules.is_empty() || !self.items.is_empty()) {
             writeln!(f)?;
         }
-        for (i, module) in self.modules.iter().enumerate() {
-            if i > 0 {
-                writeln!(f)?;
-                writeln!(f)?;
-            }
-            write!(f, "{}", module)?;
+        for module in &self.modules {
+            writeln!(f, "{}", module)?;
+            writeln!(f)?;
+        }
+        for item in &self.items {
+            writeln!(f, "{}", item)?;
+            writeln!(f)?;
         }
         if let Some(ref expr) = self.main_expr {
-            if !self.modules.is_empty() {
-                writeln!(f)?;
-                writeln!(f)?;
-            }
             write!(f, "{}", expr)?;
         }
         Ok(())

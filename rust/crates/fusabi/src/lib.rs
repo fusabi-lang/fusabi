@@ -203,21 +203,19 @@ pub fn run_source_with_options(source: &str, options: RunOptions) -> Result<Valu
         println!("Stage 2: Parsing");
     }
     let mut parser = Parser::new(tokens);
-    let ast = parser.parse()?;
+    let program = parser.parse_program()?;
     if options.verbose {
-        println!("  Parsed AST successfully");
+        println!("  Parsed Program AST successfully");
     }
 
     // Stage 3: Compilation (with optional type checking)
     if options.verbose {
         println!("Stage 3: Compilation");
     }
-    let compile_options = CompileOptions {
-        enable_type_checking: options.enable_type_checking,
-        strict_mode: options.strict_mode,
-        allow_warnings: !options.strict_mode,
-    };
-    let chunk = Compiler::compile_with_options(&ast, compile_options)?;
+    // Note: We are currently ignoring compile options like type checking for full programs
+    // until compile_program_with_options is implemented.
+    let chunk = Compiler::compile_program(&program)?;
+    
     if options.verbose {
         println!("  Generated {} instructions", chunk.instructions.len());
         println!("  Constant pool size: {}", chunk.constants.len());
@@ -279,10 +277,10 @@ pub fn run_source_with_disasm(source: &str, name: &str) -> Result<Value, FusabiE
 
     // Stage 2: Parsing
     let mut parser = Parser::new(tokens);
-    let ast = parser.parse()?;
+    let program = parser.parse_program()?;
 
     // Stage 3: Compilation
-    let chunk = Compiler::compile(&ast)?;
+    let chunk = Compiler::compile_program(&program)?;
 
     // Disassemble the chunk
     println!("\n=== Disassembly of '{}' ===", name);
@@ -316,10 +314,10 @@ pub fn run_file_with_disasm(path: &str) -> Result<Value, FusabiError> {
 
         // Stage 2: Parsing
         let mut parser = Parser::new(tokens);
-        let ast = parser.parse()?;
+        let program = parser.parse_program()?;
 
         // Stage 3: Compilation
-        Compiler::compile(&ast)?
+        Compiler::compile_program(&program)?
     };
 
     // Disassemble the chunk

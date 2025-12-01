@@ -7,10 +7,10 @@ use crate::gc::GcHeap;
 use crate::host::HostRegistry;
 use crate::instruction::Instruction;
 use crate::value::Value;
-use std::cell::RefCell;
+use std::sync::Mutex;
 use std::collections::HashMap;
 use std::fmt;
-use std::rc::Rc;
+use std::sync::Arc;
 
 /// Runtime error that can occur during VM execution
 #[derive(Debug, Clone, PartialEq)]
@@ -79,7 +79,7 @@ impl std::error::Error for VmError {}
 #[derive(Debug, Clone)]
 pub struct Frame {
     /// The closure being executed
-    pub closure: Rc<Closure>,
+    pub closure: Arc<Closure>,
     /// Instruction pointer - index into closure.chunk.instructions
     pub ip: usize,
     /// Base pointer - index into VM stack where this frame's locals start
@@ -88,7 +88,7 @@ pub struct Frame {
 
 impl Frame {
     /// Create a new frame for executing a closure
-    pub fn new(closure: Rc<Closure>, base: usize) -> Self {
+    pub fn new(closure: Arc<Closure>, base: usize) -> Self {
         Frame {
             closure,
             ip: 0,
@@ -127,7 +127,7 @@ pub struct Vm {
     /// Global variables
     pub globals: HashMap<String, Value>,
     /// Host function registry
-    pub host_registry: Rc<RefCell<HostRegistry>>,
+    pub host_registry: Arc<Mutex<HostRegistry>>,
     /// Garbage collector heap
     pub gc_heap: GcHeap,
 }
@@ -139,7 +139,7 @@ impl Vm {
             stack: Vec::new(),
             frames: Vec::new(),
             globals: HashMap::new(),
-            host_registry: Rc::new(RefCell::new(HostRegistry::new())),
+            host_registry: Arc::new(Mutex::new(HostRegistry::new())),
             gc_heap: GcHeap::new(),
         }
     }
@@ -150,7 +150,7 @@ impl Vm {
             stack: Vec::new(),
             frames: Vec::new(),
             globals: HashMap::new(),
-            host_registry: Rc::new(RefCell::new(HostRegistry::new())),
+            host_registry: Arc::new(Mutex::new(HostRegistry::new())),
             gc_heap: GcHeap::with_threshold(threshold),
         }
     }
@@ -173,7 +173,7 @@ impl Vm {
 
             // Add upvalues
             for upvalue in &frame.closure.upvalues {
-                let upvalue = upvalue.borrow();
+                let upvalue = upvalue.lock().unwrap();
                 if let Upvalue::Closed(value) = &*upvalue {
                     roots.push(value.clone());
                 }
@@ -199,7 +199,7 @@ impl Vm {
     /// Execute a chunk of bytecode
     pub fn execute(&mut self, chunk: Chunk) -> Result<Value, VmError> {
         // Wrap the top-level chunk in a closure
-        let closure = Rc::new(Closure::new(chunk));
+        let closure = Arc::new(Closure::new(chunk));
 
         // Push initial frame
         let frame = Frame::new(closure, 0);
@@ -249,7 +249,7 @@ impl Vm {
         let mut vm = Vm::new();
         
         // Wrap the chunk in a closure and push initial frame
-        let closure = Rc::new(Closure::new(chunk));
+        let closure = Arc::new(Closure::new(chunk));
         let frame = Frame::new(closure, 0);
         vm.frames.push(frame);
         
@@ -329,7 +329,7 @@ impl Vm {
                         .closure
                         .get_upvalue(idx as usize)
                         .ok_or(VmError::Runtime(format!("Invalid upvalue index: {}", idx)))?;
-                    let value = match &*upvalue.borrow() {
+                    let value = match &*upvalue.lock().unwrap() {
                         Upvalue::Closed(v) => v.clone(),
                         Upvalue::Open(stack_idx) => self.stack[*stack_idx].clone(),
                     };
@@ -344,7 +344,7 @@ impl Vm {
                         .get_upvalue(idx as usize)
                         .ok_or(VmError::Runtime(format!("Invalid upvalue index: {}", idx)))?;
 
-                    match &mut *upvalue.borrow_mut() {
+                    match &mut *upvalue.lock().unwrap() {
                         Upvalue::Closed(v) => *v = value,
                         Upvalue::Open(stack_idx) => self.stack[*stack_idx] = value,
                     };
@@ -675,7 +675,7 @@ impl Vm {
                         self.pop()?;
                     }
 
-                    self.push(Value::Closure(Rc::new(closure)));
+                    self.push(Value::Closure(Arc::new(closure)));
                 }
 
                 Instruction::Call(argc) => {
@@ -730,7 +730,7 @@ impl Vm {
                                 // Exact match: execute
                                 // Call via registry
                                 let host_fn = {
-                                    let registry = self.host_registry.borrow();
+                                    let registry = self.host_registry.lock().unwrap();
                                     registry.get(&name)
                                 }; // Drop borrow
 
@@ -805,7 +805,7 @@ impl Vm {
 
                             // Get the method function from registry
                             let method_fn = {
-                                let registry = self.host_registry.borrow();
+                                let registry = self.host_registry.lock().unwrap();
                                 registry
                                     .get_method(type_id, &method_name)
                                     .ok_or_else(|| {
@@ -908,9 +908,9 @@ impl Vm {
                     // Reverse to maintain left-to-right order
                     elements.reverse();
                     // Build array from elements
-                    use std::cell::RefCell;
-                    use std::rc::Rc;
-                    let array = Value::Array(Rc::new(RefCell::new(elements)));
+                    use std::sync::Mutex;
+                    use std::sync::Arc;
+                    let array = Value::Array(Arc::new(Mutex::new(elements)));
                     self.push(array);
                 }
 
@@ -1000,15 +1000,15 @@ impl Vm {
                     };
 
                     // Clone the array for immutable update
-                    use std::cell::RefCell;
-                    use std::rc::Rc;
+                    use std::sync::Mutex;
+                    use std::sync::Arc;
                     let new_arr = if let Value::Array(arr) = &array {
-                        let mut new_elements = arr.borrow().clone();
+                        let mut new_elements = arr.lock().unwrap().clone();
                         if idx >= new_elements.len() {
                             return Err(VmError::Runtime(format!("Index {} out of bounds", idx)));
                         }
                         new_elements[idx] = value;
-                        Value::Array(Rc::new(RefCell::new(new_elements)))
+                        Value::Array(Arc::new(Mutex::new(new_elements)))
                     } else {
                         return Err(VmError::TypeMismatch {
                             expected: "array",
@@ -1022,9 +1022,9 @@ impl Vm {
                 // Record operations
                 Instruction::MakeRecord(n) => {
                     // Pop N field name/value pairs from stack in reverse order
-                    use std::cell::RefCell;
+                    use std::sync::Mutex;
                     use std::collections::HashMap;
-                    use std::rc::Rc;
+                    use std::sync::Arc;
 
                     let mut fields = HashMap::new();
                     for _ in 0..n {
@@ -1042,7 +1042,7 @@ impl Vm {
                         fields.insert(field_name_str.to_string(), field_value);
                     }
 
-                    let record = Value::Record(Rc::new(RefCell::new(fields)));
+                    let record = Value::Record(Arc::new(Mutex::new(fields)));
                     self.push(record);
                 }
 
@@ -1252,7 +1252,7 @@ impl Vm {
     }
 
     /// Call a closure from Rust code (re-entrant)
-    pub fn call_closure(&mut self, closure: Rc<Closure>, args: &[Value]) -> Result<Value, VmError> {
+    pub fn call_closure(&mut self, closure: Arc<Closure>, args: &[Value]) -> Result<Value, VmError> {
         if closure.arity as usize != args.len() {
             return Err(VmError::Runtime(format!(
                 "Arity mismatch: expected {}, got {}",
@@ -1300,7 +1300,7 @@ impl Vm {
                     })
                 } else if total_args == arity_usize {
                     let host_fn = {
-                        let registry = self.host_registry.borrow();
+                        let registry = self.host_registry.lock().unwrap();
                         registry.get(&name)
                     };
                     if let Some(f) = host_fn {
@@ -2176,9 +2176,9 @@ mod tests {
     #[test]
     fn test_vm_array_get() {
         let mut vm = Vm::new();
-        use std::cell::RefCell;
-        use std::rc::Rc;
-        let arr = Value::Array(Rc::new(RefCell::new(vec![
+        use std::sync::Mutex;
+        use std::sync::Arc;
+        let arr = Value::Array(Arc::new(Mutex::new(vec![
             Value::Int(10),
             Value::Int(20),
             Value::Int(30),
@@ -2198,9 +2198,9 @@ mod tests {
     #[test]
     fn test_vm_array_get_bounds_error() {
         let mut vm = Vm::new();
-        use std::cell::RefCell;
-        use std::rc::Rc;
-        let arr = Value::Array(Rc::new(RefCell::new(vec![Value::Int(1)])));
+        use std::sync::Mutex;
+        use std::sync::Arc;
+        let arr = Value::Array(Arc::new(Mutex::new(vec![Value::Int(1)])));
         let chunk = ChunkBuilder::new()
             .constant(arr)
             .constant(Value::Int(5))
@@ -2216,9 +2216,9 @@ mod tests {
     #[test]
     fn test_vm_array_set() {
         let mut vm = Vm::new();
-        use std::cell::RefCell;
-        use std::rc::Rc;
-        let arr = Value::Array(Rc::new(RefCell::new(vec![
+        use std::sync::Mutex;
+        use std::sync::Arc;
+        let arr = Value::Array(Arc::new(Mutex::new(vec![
             Value::Int(1),
             Value::Int(2),
             Value::Int(3),
@@ -2244,9 +2244,9 @@ mod tests {
     #[test]
     fn test_vm_array_length() {
         let mut vm = Vm::new();
-        use std::cell::RefCell;
-        use std::rc::Rc;
-        let arr = Value::Array(Rc::new(RefCell::new(vec![
+        use std::sync::Mutex;
+        use std::sync::Arc;
+        let arr = Value::Array(Arc::new(Mutex::new(vec![
             Value::Int(1),
             Value::Int(2),
             Value::Int(3),
@@ -2264,9 +2264,9 @@ mod tests {
     #[test]
     fn test_vm_array_update() {
         let mut vm = Vm::new();
-        use std::cell::RefCell;
-        use std::rc::Rc;
-        let arr = Value::Array(Rc::new(RefCell::new(vec![
+        use std::sync::Mutex;
+        use std::sync::Arc;
+        let arr = Value::Array(Arc::new(Mutex::new(vec![
             Value::Int(1),
             Value::Int(2),
             Value::Int(3),
@@ -2292,9 +2292,9 @@ mod tests {
     #[test]
     fn test_vm_array_negative_index_error() {
         let mut vm = Vm::new();
-        use std::cell::RefCell;
-        use std::rc::Rc;
-        let arr = Value::Array(Rc::new(RefCell::new(vec![Value::Int(1)])));
+        use std::sync::Mutex;
+        use std::sync::Arc;
+        let arr = Value::Array(Arc::new(Mutex::new(vec![Value::Int(1)])));
         let chunk = ChunkBuilder::new()
             .constant(arr)
             .constant(Value::Int(-1))
@@ -2344,9 +2344,9 @@ mod tests {
     #[test]
     fn test_vm_array_in_local() {
         let mut vm = Vm::new();
-        use std::cell::RefCell;
-        use std::rc::Rc;
-        let arr = Value::Array(Rc::new(RefCell::new(vec![Value::Int(1), Value::Int(2)])));
+        use std::sync::Mutex;
+        use std::sync::Arc;
+        let arr = Value::Array(Arc::new(Mutex::new(vec![Value::Int(1), Value::Int(2)])));
         let chunk = ChunkBuilder::new()
             .constant(arr.clone())
             .instruction(Instruction::LoadConst(0))
@@ -2361,9 +2361,9 @@ mod tests {
     #[test]
     fn test_vm_array_nested() {
         let mut vm = Vm::new();
-        use std::cell::RefCell;
-        use std::rc::Rc;
-        let inner = Value::Array(Rc::new(RefCell::new(vec![Value::Int(1), Value::Int(2)])));
+        use std::sync::Mutex;
+        use std::sync::Arc;
+        let inner = Value::Array(Arc::new(Mutex::new(vec![Value::Int(1), Value::Int(2)])));
         let chunk = ChunkBuilder::new()
             .constant(inner)
             .instruction(Instruction::LoadConst(0))

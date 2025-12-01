@@ -254,19 +254,19 @@ fn mark_value(value: &Value, tracer: &mut Tracer, objects: &HashMap<usize, GcObj
             }
         }
         Value::Array(arr) => {
-            let arr = arr.borrow();
+            let arr = arr.lock().unwrap();
             for elem in arr.iter() {
                 mark_value(elem, tracer, objects);
             }
         }
         Value::Record(fields) => {
-            let fields = fields.borrow();
+            let fields = fields.lock().unwrap();
             for value in fields.values() {
                 mark_value(value, tracer, objects);
             }
         }
         Value::Map(map) => {
-            let map = map.borrow();
+            let map = map.lock().unwrap();
             for value in map.values() {
                 mark_value(value, tracer, objects);
             }
@@ -300,7 +300,7 @@ fn mark_closure(closure: &Closure, tracer: &mut Tracer, objects: &HashMap<usize,
 
     // Mark upvalues
     for upvalue in &closure.upvalues {
-        let upvalue = upvalue.borrow();
+        let upvalue = upvalue.lock().unwrap();
         match &*upvalue {
             Upvalue::Closed(value) => mark_value(value, tracer, objects),
             Upvalue::Open(_) => {
@@ -326,11 +326,11 @@ fn estimate_value_size(value: &Value) -> usize {
         }
         Value::Nil => 0,
         Value::Array(arr) => {
-            let arr = arr.borrow();
+            let arr = arr.lock().unwrap();
             std::mem::size_of::<Vec<Value>>() + arr.iter().map(estimate_value_size).sum::<usize>()
         }
         Value::Record(fields) => {
-            let fields = fields.borrow();
+            let fields = fields.lock().unwrap();
             std::mem::size_of::<HashMap<String, Value>>()
                 + fields
                     .iter()
@@ -338,7 +338,7 @@ fn estimate_value_size(value: &Value) -> usize {
                     .sum::<usize>()
         }
         Value::Map(map) => {
-            let map = map.borrow();
+            let map = map.lock().unwrap();
             std::mem::size_of::<HashMap<String, Value>>()
                 + map
                     .iter()
@@ -389,13 +389,13 @@ impl Trace for Value {
             }
             Value::Tuple(elements) => elements.trace(tracer),
             Value::Array(arr) => {
-                let arr = arr.borrow();
+                let arr = arr.lock().unwrap();
                 for elem in arr.iter() {
                     elem.trace(tracer);
                 }
             }
             Value::Record(fields) => {
-                let fields = fields.borrow();
+                let fields = fields.lock().unwrap();
                 for value in fields.values() {
                     value.trace(tracer);
                 }
@@ -417,7 +417,7 @@ impl Trace for Closure {
 
         // Trace upvalues
         for upvalue in &self.upvalues {
-            let upvalue = upvalue.borrow();
+            let upvalue = upvalue.lock().unwrap();
             match &*upvalue {
                 Upvalue::Closed(value) => value.trace(tracer),
                 Upvalue::Open(_) => {
@@ -430,8 +430,8 @@ impl Trace for Closure {
 
 #[cfg(test)]
 mod tests {
-    use std::rc::Rc;
-    use std::cell::RefCell;
+    use std::sync::Arc;
+    use std::sync::Mutex;
     use super::*;
 
     #[test]
@@ -570,16 +570,16 @@ mod tests {
         // Create two records that reference each other (cycle)
         let mut fields1 = HashMap::new();
         fields1.insert("value".to_string(), Value::Int(1));
-        let record1 = Value::Record(Rc::new(RefCell::new(fields1)));
+        let record1 = Value::Record(Arc::new(Mutex::new(fields1)));
 
         let mut fields2 = HashMap::new();
         fields2.insert("value".to_string(), Value::Int(2));
         fields2.insert("next".to_string(), record1.clone());
-        let record2 = Value::Record(Rc::new(RefCell::new(fields2)));
+        let record2 = Value::Record(Arc::new(Mutex::new(fields2)));
 
         // Create the cycle
         if let Value::Record(r1) = &record1 {
-            r1.borrow_mut().insert("next".to_string(), record2.clone());
+            r1.lock().unwrap().insert("next".to_string(), record2.clone());
         }
 
         heap.allocate(record1.clone());

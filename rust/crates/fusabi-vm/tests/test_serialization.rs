@@ -5,7 +5,7 @@ use fusabi_vm::{
     chunk::Chunk, deserialize_chunk, instruction::Instruction, serialize_chunk, value::Value,
     FZB_MAGIC, FZB_VERSION,
 };
-use std::rc::Rc;
+use std::sync::Arc;
 
 #[test]
 fn test_serialize_deserialize_chunk_simple() {
@@ -35,7 +35,7 @@ fn test_serialize_deserialize_chunk_with_closure_prototype() {
     let closure_prototype = Closure::with_arity(inner_chunk, 1);
 
     let mut chunk = Chunk::new();
-    let const_closure_idx = chunk.add_constant(Value::Closure(Rc::new(closure_prototype)));
+    let const_closure_idx = chunk.add_constant(Value::Closure(Arc::new(closure_prototype)));
     chunk.emit(Instruction::MakeClosure(const_closure_idx, 0)); // 0 upvalues
     chunk.emit(Instruction::Return);
 

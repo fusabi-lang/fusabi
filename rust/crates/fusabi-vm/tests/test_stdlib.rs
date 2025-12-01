@@ -6,7 +6,7 @@ use fusabi_vm::stdlib::option::*;
 use fusabi_vm::stdlib::register_stdlib;
 use fusabi_vm::stdlib::string::*;
 use fusabi_vm::{Value, Vm, VmError};
-use std::rc::Rc;
+use std::sync::Arc;
 
 // Helper to get a configured VM for tests
 fn get_test_vm() -> Vm {
@@ -202,14 +202,14 @@ fn test_register_stdlib_functions_and_globals() {
     register_stdlib(&mut vm); // Register functions and populate globals
 
     // Verify HostRegistry
-    assert!(vm.host_registry.borrow().has_function("List.length"));
-    assert!(vm.host_registry.borrow().has_function("String.length"));
-    assert!(vm.host_registry.borrow().has_function("Option.isSome"));
+    assert!(vm.host_registry.lock().unwrap().has_function("List.length"));
+    assert!(vm.host_registry.lock().unwrap().has_function("String.length"));
+    assert!(vm.host_registry.lock().unwrap().has_function("Option.isSome"));
 
     // Verify Globals (Module Records)
     assert!(vm.globals.contains_key("List"));
     if let Some(Value::Record(r)) = vm.globals.get("List") {
-        let borrowed = r.borrow();
+        let borrowed = r.lock().unwrap();
         assert!(borrowed.contains_key("length"));
         assert!(
             matches!(borrowed.get("length").unwrap(), Value::NativeFn { name, arity: 1, args: _ } if name == "List.length")
@@ -220,13 +220,13 @@ fn test_register_stdlib_functions_and_globals() {
 
     assert!(vm.globals.contains_key("String"));
     if let Some(Value::Record(r)) = vm.globals.get("String") {
-        let borrowed = r.borrow();
+        let borrowed = r.lock().unwrap();
         assert!(borrowed.contains_key("length"));
     }
 
     assert!(vm.globals.contains_key("Option"));
     if let Some(Value::Record(r)) = vm.globals.get("Option") {
-        let borrowed = r.borrow();
+        let borrowed = r.lock().unwrap();
         assert!(borrowed.contains_key("isSome"));
     }
 }
@@ -241,7 +241,7 @@ fn call_stdlib_function(vm: &mut Vm, name: &str, args: &[Value]) -> Result<Value
             .ok_or_else(|| VmError::Runtime(format!("Undefined module: {}", module)))?;
         if let Value::Record(r) = module_val {
             let func = r
-                .borrow()
+                .lock().unwrap()
                 .get(func_name)
                 .cloned()
                 .ok_or_else(|| VmError::Runtime(format!("Undefined function: {}", name)))?;
@@ -327,7 +327,7 @@ fn test_list_map_through_vm() {
         .instruction(fusabi_vm::instruction::Instruction::LoadLocal(0))
         .instruction(fusabi_vm::instruction::Instruction::Return)
         .build();
-    let func_closure = Rc::new(fusabi_vm::closure::Closure::with_arity(func_chunk, 1));
+    let func_closure = Arc::new(fusabi_vm::closure::Closure::with_arity(func_chunk, 1));
 
     let result =
         call_stdlib_function(&mut vm, "List.map", &[Value::Closure(func_closure), list]).unwrap();
@@ -385,7 +385,7 @@ fn test_option_map_through_vm() {
         .instruction(fusabi_vm::instruction::Instruction::Mul)
         .instruction(fusabi_vm::instruction::Instruction::Return)
         .build();
-    let double_closure = Rc::new(fusabi_vm::closure::Closure::with_arity(double_chunk, 1));
+    let double_closure = Arc::new(fusabi_vm::closure::Closure::with_arity(double_chunk, 1));
 
     let result = call_stdlib_function(&mut vm, "Option.map", &[Value::Closure(double_closure), some_val]).unwrap();
 
@@ -451,7 +451,7 @@ fn test_option_map_none_through_vm() {
         .instruction(fusabi_vm::instruction::Instruction::LoadLocal(0))
         .instruction(fusabi_vm::instruction::Instruction::Return)
         .build();
-    let func_closure = Rc::new(fusabi_vm::closure::Closure::with_arity(func_chunk, 1));
+    let func_closure = Arc::new(fusabi_vm::closure::Closure::with_arity(func_chunk, 1));
 
     let result = call_stdlib_function(&mut vm, "Option.map", &[Value::Closure(func_closure), none_val]).unwrap();
 
@@ -508,7 +508,7 @@ fn test_option_map2_through_vm() {
         .instruction(fusabi_vm::instruction::Instruction::Add)
         .instruction(fusabi_vm::instruction::Instruction::Return)
         .build();
-    let add_closure = Rc::new(fusabi_vm::closure::Closure::with_arity(add_chunk, 2));
+    let add_closure = Arc::new(fusabi_vm::closure::Closure::with_arity(add_chunk, 2));
 
     // Some(3) + Some(4) = Some(7)
     let result1 = call_stdlib_function(&mut vm, "Option.map2", &[Value::Closure(add_closure.clone()), some1, some2]).unwrap();
@@ -544,7 +544,7 @@ fn test_option_iter_through_vm() {
         .instruction(fusabi_vm::instruction::Instruction::Pop)
         .instruction(fusabi_vm::instruction::Instruction::Return)
         .build();
-    let func_closure = Rc::new(fusabi_vm::closure::Closure::with_arity(func_chunk, 1));
+    let func_closure = Arc::new(fusabi_vm::closure::Closure::with_arity(func_chunk, 1));
 
     let result = call_stdlib_function(&mut vm, "Option.iter", &[Value::Closure(func_closure), some_val]).unwrap();
     assert_eq!(result, Value::Unit);

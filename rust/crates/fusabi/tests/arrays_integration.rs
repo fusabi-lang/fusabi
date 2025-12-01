@@ -14,7 +14,7 @@ fn test_empty_array_literal() {
     let result = run_source(source).unwrap();
     assert!(matches!(result, Value::Array(_)));
     if let Value::Array(arr) = result {
-        assert_eq!(arr.borrow().len(), 0);
+        assert_eq!(arr.lock().unwrap().len(), 0);
     }
 }
 
@@ -24,7 +24,7 @@ fn test_single_element_array() {
     let result = run_source(source).unwrap();
     assert!(matches!(result, Value::Array(_)));
     if let Value::Array(arr) = result {
-        let borrowed = arr.borrow();
+        let borrowed = arr.lock().unwrap();
         assert_eq!(borrowed.len(), 1);
         assert_eq!(borrowed[0], Value::Int(42));
     }
@@ -36,7 +36,7 @@ fn test_multiple_element_array() {
     let result = run_source(source).unwrap();
     assert!(matches!(result, Value::Array(_)));
     if let Value::Array(arr) = result {
-        let borrowed = arr.borrow();
+        let borrowed = arr.lock().unwrap();
         assert_eq!(borrowed.len(), 5);
         assert_eq!(borrowed[0], Value::Int(1));
         assert_eq!(borrowed[4], Value::Int(5));
@@ -72,7 +72,7 @@ fn test_array_with_different_types() {
     let result = run_source(source).unwrap();
     assert!(matches!(result, Value::Array(_)));
     if let Value::Array(arr) = result {
-        let borrowed = arr.borrow();
+        let borrowed = arr.lock().unwrap();
         assert_eq!(borrowed.len(), 3);
         assert_eq!(borrowed[0], Value::Int(1));
         assert_eq!(borrowed[1], Value::Bool(true));
@@ -92,7 +92,7 @@ fn test_simple_update() {
     "#;
     let result = run_source(source).unwrap();
     if let Value::Array(arr) = result {
-        let borrowed = arr.borrow();
+        let borrowed = arr.lock().unwrap();
         assert_eq!(borrowed[0], Value::Int(1));
         assert_eq!(borrowed[1], Value::Int(99));
         assert_eq!(borrowed[2], Value::Int(3));
@@ -111,7 +111,7 @@ fn test_multiple_updates() {
     "#;
     let result = run_source(source).unwrap();
     if let Value::Array(arr) = result {
-        let borrowed = arr.borrow();
+        let borrowed = arr.lock().unwrap();
         assert_eq!(borrowed[0], Value::Int(10));
         assert_eq!(borrowed[2], Value::Int(30));
     } else {
@@ -127,7 +127,7 @@ fn test_chained_updates() {
     "#;
     let result = run_source(source).unwrap();
     if let Value::Array(arr) = result {
-        let borrowed = arr.borrow();
+        let borrowed = arr.lock().unwrap();
         assert_eq!(borrowed[0], Value::Int(10));
         assert_eq!(borrowed[1], Value::Int(20));
         assert_eq!(borrowed[2], Value::Int(30));
@@ -158,7 +158,7 @@ fn test_update_with_expressions() {
     "#;
     let result = run_source(source).unwrap();
     if let Value::Array(arr) = result {
-        let borrowed = arr.borrow();
+        let borrowed = arr.lock().unwrap();
         assert_eq!(borrowed[1], Value::Int(100));
     } else {
         panic!("Expected array");
@@ -186,11 +186,11 @@ fn test_array_of_arrays() {
     "#;
     let result = run_source(source).unwrap();
     if let Value::Array(outer) = result {
-        let borrowed = outer.borrow();
+        let borrowed = outer.lock().unwrap();
         assert_eq!(borrowed.len(), 3);
 
         if let Value::Array(first_row) = &borrowed[0] {
-            let first_borrowed = first_row.borrow();
+            let first_borrowed = first_row.lock().unwrap();
             assert_eq!(first_borrowed[0], Value::Int(1));
             assert_eq!(first_borrowed[1], Value::Int(2));
         } else {
@@ -219,9 +219,9 @@ fn test_update_nested_array() {
     "#;
     let result = run_source(source).unwrap();
     if let Value::Array(outer) = result {
-        let borrowed = outer.borrow();
+        let borrowed = outer.lock().unwrap();
         if let Value::Array(first_row) = &borrowed[0] {
-            let first_borrowed = first_row.borrow();
+            let first_borrowed = first_row.lock().unwrap();
             assert_eq!(first_borrowed[0], Value::Int(99));
             assert_eq!(first_borrowed[1], Value::Int(88));
         } else {
@@ -249,12 +249,12 @@ fn test_empty_nested_arrays() {
     "#;
     let result = run_source(source).unwrap();
     if let Value::Array(outer) = result {
-        let borrowed = outer.borrow();
+        let borrowed = outer.lock().unwrap();
         assert_eq!(borrowed.len(), 3);
 
         for elem in borrowed.iter() {
             if let Value::Array(inner) = elem {
-                assert_eq!(inner.borrow().len(), 0);
+                assert_eq!(inner.lock().unwrap().len(), 0);
             } else {
                 panic!("Expected nested array");
             }

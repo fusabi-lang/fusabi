@@ -38,7 +38,7 @@ fn test_method_dispatch_basic() {
     // Register the increment method
     let mut vm = Vm::new();
     {
-        let mut registry = vm.host_registry.borrow_mut();
+        let mut registry = vm.host_registry.lock().unwrap();
         registry.register_method::<Counter, _>("increment", |_vm, args| {
             // First arg is receiver
             if args.is_empty() {
@@ -115,7 +115,7 @@ fn test_method_dispatch_with_args() {
 
     let mut vm = Vm::new();
     {
-        let mut registry = vm.host_registry.borrow_mut();
+        let mut registry = vm.host_registry.lock().unwrap();
         registry.register_method::<Counter, _>("add", |_vm, args| {
             if args.len() < 2 {
                 return Err(VmError::Runtime("Expected receiver and argument".into()));

@@ -3,16 +3,16 @@ use crate::vm::{Vm, VmError};
 use std::any::TypeId;
 use std::collections::HashMap;
 use std::fmt;
-use std::rc::Rc;
+use std::sync::Arc;
 
 /// Host function signature - takes a VM context and slice of values, returns a value or error
 pub type HostFn = dyn Fn(&mut Vm, &[Value]) -> Result<Value, VmError> + Send + Sync;
 
 /// Registry for host functions that can be called from Fusabi scripts
 pub struct HostRegistry {
-    functions: HashMap<String, Rc<HostFn>>,
+    functions: HashMap<String, Arc<HostFn>>,
     /// Method registry keyed by (TypeId, method_name)
-    methods: HashMap<(TypeId, String), Rc<HostFn>>,
+    methods: HashMap<(TypeId, String), Arc<HostFn>>,
 }
 
 impl fmt::Debug for HostRegistry {
@@ -53,7 +53,7 @@ impl HostRegistry {
     where
         F: Fn(&mut Vm, &[Value]) -> Result<Value, VmError> + Send + Sync + 'static,
     {
-        self.functions.insert(name.to_string(), Rc::new(f));
+        self.functions.insert(name.to_string(), Arc::new(f));
     }
 
     /// Register a nullary function (no arguments)
@@ -129,7 +129,7 @@ impl HostRegistry {
     }
 
     /// Get a registered host function
-    pub fn get(&self, name: &str) -> Option<Rc<HostFn>> {
+    pub fn get(&self, name: &str) -> Option<Arc<HostFn>> {
         self.functions.get(name).cloned()
     }
 
@@ -178,11 +178,11 @@ impl HostRegistry {
     {
         let type_id = TypeId::of::<T>();
         let key = (type_id, method_name.to_string());
-        self.methods.insert(key, Rc::new(f));
+        self.methods.insert(key, Arc::new(f));
     }
 
     /// Get a registered method for a specific type
-    pub fn get_method(&self, type_id: TypeId, method_name: &str) -> Option<Rc<HostFn>> {
+    pub fn get_method(&self, type_id: TypeId, method_name: &str) -> Option<Arc<HostFn>> {
         let key = (type_id, method_name.to_string());
         self.methods.get(&key).cloned()
     }

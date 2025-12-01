@@ -6,11 +6,11 @@ use crate::value::Value;
 #[cfg(feature = "json")]
 use crate::vm::VmError;
 #[cfg(feature = "json")]
-use std::cell::RefCell;
+use std::sync::Mutex;
 #[cfg(feature = "json")]
 use std::collections::HashMap;
 #[cfg(feature = "json")]
-use std::rc::Rc;
+use std::sync::Arc;
 
 #[cfg(feature = "json")]
 /// Parse a JSON string into a Fusabi Value
@@ -59,14 +59,14 @@ fn json_value_to_fusabi(json: &serde_json::Value) -> Result<Value, VmError> {
             for item in arr {
                 values.push(json_value_to_fusabi(item)?);
             }
-            Ok(Value::Array(Rc::new(RefCell::new(values))))
+            Ok(Value::Array(Arc::new(Mutex::new(values))))
         }
         serde_json::Value::Object(obj) => {
             let mut fields = HashMap::new();
             for (key, value) in obj {
                 fields.insert(key.clone(), json_value_to_fusabi(value)?);
             }
-            Ok(Value::Record(Rc::new(RefCell::new(fields))))
+            Ok(Value::Record(Arc::new(Mutex::new(fields))))
         }
     }
 }
@@ -106,7 +106,7 @@ fn fusabi_value_to_json(value: &Value) -> Result<serde_json::Value, VmError> {
         }
         Value::Str(s) => Ok(serde_json::Value::String(s.clone())),
         Value::Array(arr) => {
-            let borrowed = arr.borrow();
+            let borrowed = arr.lock().unwrap();
             let mut json_arr = Vec::new();
             for item in borrowed.iter() {
                 json_arr.push(fusabi_value_to_json(item)?);
@@ -121,7 +121,7 @@ fn fusabi_value_to_json(value: &Value) -> Result<serde_json::Value, VmError> {
             Ok(serde_json::Value::Array(json_arr))
         }
         Value::Record(rec) | Value::Map(rec) => {
-            let borrowed = rec.borrow();
+            let borrowed = rec.lock().unwrap();
             let mut json_obj = serde_json::Map::new();
             for (key, val) in borrowed.iter() {
                 json_obj.insert(key.clone(), fusabi_value_to_json(val)?);
@@ -217,7 +217,7 @@ mod tests {
         let result = json_parse(&Value::Str("[1, 2, 3]".to_string())).unwrap();
         match result {
             Value::Array(arr) => {
-                let borrowed = arr.borrow();
+                let borrowed = arr.lock().unwrap();
                 assert_eq!(borrowed.len(), 3);
                 assert_eq!(borrowed[0], Value::Int(1));
                 assert_eq!(borrowed[1], Value::Int(2));
@@ -232,7 +232,7 @@ mod tests {
         let result = json_parse(&Value::Str(r#"{"name": "Alice", "age": 30}"#.to_string())).unwrap();
         match result {
             Value::Record(rec) => {
-                let borrowed = rec.borrow();
+                let borrowed = rec.lock().unwrap();
                 assert_eq!(borrowed.get("name"), Some(&Value::Str("Alice".to_string())));
                 assert_eq!(borrowed.get("age"), Some(&Value::Int(30)));
             }
@@ -266,7 +266,7 @@ mod tests {
 
     #[test]
     fn test_stringify_array() {
-        let arr = Value::Array(Rc::new(RefCell::new(vec![
+        let arr = Value::Array(Arc::new(Mutex::new(vec![
             Value::Int(1),
             Value::Int(2),
             Value::Int(3),

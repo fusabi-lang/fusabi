@@ -5,10 +5,10 @@ use fusabi_frontend::compiler::CompileOptions;
 use fusabi_frontend::{Compiler, Lexer, Parser};
 use fusabi_vm::{HostData, HostRegistry, Value, Vm, VmError};
 use std::any::Any;
-use std::cell::RefCell;
+use std::sync::Mutex;
 use std::collections::HashMap;
 use std::convert::TryInto;
-use std::rc::Rc;
+use std::sync::Arc;
 
 /// Type alias for a raw host function
 pub type HostFunction = Box<dyn Fn(&mut Vm, &[Value]) -> Result<Value, VmError> + Send + Sync>;
@@ -159,7 +159,7 @@ impl Module {
 /// ```
 pub struct FusabiEngine {
     vm: Vm,
-    host_registry: Rc<RefCell<HostRegistry>>,
+    host_registry: Arc<Mutex<HostRegistry>>,
     global_bindings: HashMap<String, Value>,
 }
 
@@ -275,7 +275,7 @@ impl FusabiEngine {
     {
         // Wrap the closure to ignore the VM argument, maintaining backward compatibility
         self.host_registry
-            .borrow_mut()
+            .lock().unwrap()
             .register(name, move |_vm, args| f(args));
     }
 
@@ -284,7 +284,7 @@ impl FusabiEngine {
     where
         F: Fn(&mut Vm, &[Value]) -> Result<Value, VmError> + Send + Sync + 'static,
     {
-        self.host_registry.borrow_mut().register(name, f);
+        self.host_registry.lock().unwrap().register(name, f);
     }
 
     /// Register a nullary host function (no arguments)
@@ -293,7 +293,7 @@ impl FusabiEngine {
         F: Fn() -> Result<Value, VmError> + Send + Sync + 'static,
     {
         self.host_registry
-            .borrow_mut()
+            .lock().unwrap()
             .register_fn0(name, move |_vm| f());
     }
 
@@ -303,7 +303,7 @@ impl FusabiEngine {
         F: Fn(Value) -> Result<Value, VmError> + Send + Sync + 'static,
     {
         self.host_registry
-            .borrow_mut()
+            .lock().unwrap()
             .register_fn1(name, move |_vm, arg| f(arg));
     }
 
@@ -313,7 +313,7 @@ impl FusabiEngine {
         F: Fn(Value, Value) -> Result<Value, VmError> + Send + Sync + 'static,
     {
         self.host_registry
-            .borrow_mut()
+            .lock().unwrap()
             .register_fn2(name, move |_vm, arg1, arg2| f(arg1, arg2));
     }
 
@@ -323,25 +323,25 @@ impl FusabiEngine {
         F: Fn(Value, Value, Value) -> Result<Value, VmError> + Send + Sync + 'static,
     {
         self.host_registry
-            .borrow_mut()
+            .lock().unwrap()
             .register_fn3(name, move |_vm, arg1, arg2, arg3| f(arg1, arg2, arg3));
     }
 
     /// Call a registered host function
     pub fn call_host(&mut self, name: &str, args: &[Value]) -> Result<Value, VmError> {
         // Pass the VM instance to the host function
-        let registry = self.host_registry.borrow();
+        let registry = self.host_registry.lock().unwrap();
         registry.call(name, &mut self.vm, args)
     }
 
     /// Check if a host function is registered
     pub fn has_host_function(&self, name: &str) -> bool {
-        self.host_registry.borrow().has_function(name)
+        self.host_registry.lock().unwrap().has_function(name)
     }
 
     /// Get all registered host function names
     pub fn host_function_names(&self) -> Vec<String> {
-        self.host_registry.borrow().function_names()
+        self.host_registry.lock().unwrap().function_names()
     }
 
     /// Register a module with namespaced functions
@@ -369,7 +369,7 @@ impl FusabiEngine {
         let module_name = module.name().to_string();
         for (fn_name, f) in module.functions() {
             let full_name = format!("{}.{}", module_name, fn_name);
-            self.host_registry.borrow_mut().register(&full_name, f);
+            self.host_registry.lock().unwrap().register(&full_name, f);
         }
     }
 
@@ -388,7 +388,7 @@ impl FusabiEngine {
     /// let store = EventStore { events: vec![] };
     /// let store_value = engine.create_host_data(store, "EventStore");
     /// ```
-    pub fn create_host_data<T: Any + 'static>(&self, data: T, type_name: &str) -> Value {
+    pub fn create_host_data<T: Any + Send + 'static>(&self, data: T, type_name: &str) -> Value {
         Value::HostData(HostData::new(data, type_name))
     }
 
@@ -405,7 +405,7 @@ impl FusabiEngine {
     /// Execute a host function call (for demonstration purposes)
     /// In a full implementation, this would be integrated with the VM execution
     pub fn execute_host_call(&mut self, name: &str, args: &[Value]) -> Result<Value, String> {
-        let registry = self.host_registry.borrow();
+        let registry = self.host_registry.lock().unwrap();
         registry
             .call(name, &mut self.vm, args)
             .map_err(|e| format!("Host function error: {:?}", e))
@@ -463,7 +463,7 @@ mod tests {
     #[test]
     fn test_engine_creation() {
         let engine = FusabiEngine::new();
-        assert!(engine.host_registry.borrow().count() >= 20);
+        assert!(engine.host_registry.lock().unwrap().count() >= 20);
     }
 
     #[test]

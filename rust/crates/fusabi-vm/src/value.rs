@@ -3,23 +3,57 @@
 
 use crate::closure::Closure;
 use std::any::{Any, TypeId};
-use std::cell::RefCell;
 use std::collections::HashMap;
 use std::fmt;
-use std::rc::Rc;
+use std::ops::{Deref, DerefMut};
+use std::sync::{Arc, Mutex, MutexGuard};
+
+/// Immutable locked access to host data
+pub struct LockedHostData<'a, T: 'static> {
+    guard: MutexGuard<'a, dyn Any + Send>,
+    _phantom: std::marker::PhantomData<T>,
+}
+
+impl<'a, T: Any + 'static> Deref for LockedHostData<'a, T> {
+    type Target = T;
+
+    fn deref(&self) -> &Self::Target {
+        self.guard.downcast_ref::<T>().unwrap()
+    }
+}
+
+/// Mutable locked access to host data
+pub struct LockedHostDataMut<'a, T: 'static> {
+    guard: MutexGuard<'a, dyn Any + Send>,
+    _phantom: std::marker::PhantomData<T>,
+}
+
+impl<'a, T: Any + 'static> Deref for LockedHostDataMut<'a, T> {
+    type Target = T;
+
+    fn deref(&self) -> &Self::Target {
+        self.guard.downcast_ref::<T>().unwrap()
+    }
+}
+
+impl<'a, T: Any + 'static> DerefMut for LockedHostDataMut<'a, T> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        self.guard.downcast_mut::<T>().unwrap()
+    }
+}
 
 /// Wrapper for host data that provides type safety
 pub struct HostData {
-    data: Rc<RefCell<dyn Any>>,
+    data: Arc<Mutex<dyn Any + Send>>,
     type_name: String,
     type_id: TypeId,
 }
 
 impl HostData {
     /// Create a new HostData wrapper
-    pub fn new<T: Any + 'static>(data: T, type_name: &str) -> Self {
+    pub fn new<T: Any + Send + 'static>(data: T, type_name: &str) -> Self {
         Self {
-            data: Rc::new(RefCell::new(data)),
+            data: Arc::new(Mutex::new(data)),
             type_name: type_name.to_string(),
             type_id: TypeId::of::<T>(),
         }
@@ -35,18 +69,38 @@ impl HostData {
         self.type_id
     }
 
-    /// Try to borrow the data as a specific type
-    pub fn try_borrow<T: Any + 'static>(&self) -> Option<std::cell::Ref<'_, T>> {
-        std::cell::Ref::filter_map(self.data.borrow(), |any| any.downcast_ref::<T>()).ok()
+    /// Try to access the data as a specific type via a closure
+    /// Returns None if the type doesn't match
+    pub fn try_borrow<T: Any + 'static>(&self) -> Option<LockedHostData<'_, T>> {
+        if self.type_id == TypeId::of::<T>() {
+            Some(LockedHostData {
+                guard: self.data.lock().unwrap(),
+                _phantom: std::marker::PhantomData,
+            })
+        } else {
+            None
+        }
     }
 
-    /// Try to borrow the data mutably as a specific type
-    pub fn try_borrow_mut<T: Any + 'static>(&self) -> Option<std::cell::RefMut<'_, T>> {
-        std::cell::RefMut::filter_map(self.data.borrow_mut(), |any| any.downcast_mut::<T>()).ok()
+    /// Try to access the data mutably as a specific type
+    pub fn try_borrow_mut<T: Any + 'static>(&self) -> Option<LockedHostDataMut<'_, T>> {
+        if self.type_id == TypeId::of::<T>() {
+            Some(LockedHostDataMut {
+                guard: self.data.lock().unwrap(),
+                _phantom: std::marker::PhantomData,
+            })
+        } else {
+            None
+        }
     }
 
-    /// Clone the underlying Rc
-    pub fn clone_rc(&self) -> Rc<RefCell<dyn Any>> {
+    /// Check if the wrapped data is of a specific type
+    pub fn is_type<T: Any + 'static>(&self) -> bool {
+        self.type_id == TypeId::of::<T>()
+    }
+
+    /// Clone the underlying Arc
+    pub fn clone_arc(&self) -> Arc<Mutex<dyn Any + Send>> {
         self.data.clone()
     }
 }
@@ -69,7 +123,7 @@ impl fmt::Debug for HostData {
 
 impl PartialEq for HostData {
     fn eq(&self, other: &Self) -> bool {
-        Rc::ptr_eq(&self.data, &other.data)
+        Arc::ptr_eq(&self.data, &other.data)
     }
 }
 
@@ -78,7 +132,7 @@ impl Default for HostData {
         // This is only used by serde when skipping
         // It should never actually be used
         Self {
-            data: Rc::new(RefCell::new(())),
+            data: Arc::new(Mutex::new(())),
             type_name: "<invalid>".to_string(),
             type_id: TypeId::of::<()>(),
         }
@@ -89,7 +143,7 @@ impl Default for HostData {
 ///
 /// Note: HostData variant cannot be serialized/deserialized with serde.
 /// Values containing HostData should not be persisted to bytecode files.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum Value {
     /// 64-bit signed integer
@@ -109,13 +163,13 @@ pub enum Value {
     /// Empty list []
     Nil,
     /// Mutable array with vector-based storage
-    Array(Rc<RefCell<Vec<Value>>>),
+    Array(Arc<Mutex<Vec<Value>>>),
     /// Record with field name -> value mapping
     /// Records are immutable - updates create new instances
-    Record(Rc<RefCell<HashMap<String, Value>>>),
+    Record(Arc<Mutex<HashMap<String, Value>>>),
     /// Map with string keys and value mapping
     /// Maps are immutable - updates create new instances
-    Map(Rc<RefCell<HashMap<String, Value>>>),
+    Map(Arc<Mutex<HashMap<String, Value>>>),
     /// Discriminated union variant value
     /// Contains: type_name, variant_name, field values
     Variant {
@@ -124,7 +178,7 @@ pub enum Value {
         fields: Vec<Value>,
     },
     /// Closure (function with captured upvalues)
-    Closure(Rc<Closure>),
+    Closure(Arc<Closure>),
     /// Native Function (name, arity, applied_args)
     NativeFn {
         name: String,
@@ -136,6 +190,62 @@ pub enum Value {
     /// It exists only for runtime host-guest interop.
     #[cfg_attr(feature = "serde", serde(skip))]
     HostData(HostData),
+}
+
+impl PartialEq for Value {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Value::Int(a), Value::Int(b)) => a == b,
+            (Value::Float(a), Value::Float(b)) => a == b,
+            (Value::Bool(a), Value::Bool(b)) => a == b,
+            (Value::Str(a), Value::Str(b)) => a == b,
+            (Value::Unit, Value::Unit) => true,
+            (Value::Tuple(a), Value::Tuple(b)) => a == b,
+            (Value::Cons { head: h1, tail: t1 }, Value::Cons { head: h2, tail: t2 }) => {
+                h1 == h2 && t1 == t2
+            }
+            (Value::Nil, Value::Nil) => true,
+            (Value::Array(a), Value::Array(b)) => {
+                // Compare by pointer equality first, then by content
+                Arc::ptr_eq(a, b) || *a.lock().unwrap() == *b.lock().unwrap()
+            }
+            (Value::Record(a), Value::Record(b)) => {
+                // Compare by pointer equality first, then by content
+                Arc::ptr_eq(a, b) || *a.lock().unwrap() == *b.lock().unwrap()
+            }
+            (Value::Map(a), Value::Map(b)) => {
+                // Compare by pointer equality first, then by content
+                Arc::ptr_eq(a, b) || *a.lock().unwrap() == *b.lock().unwrap()
+            }
+            (
+                Value::Variant {
+                    type_name: t1,
+                    variant_name: v1,
+                    fields: f1,
+                },
+                Value::Variant {
+                    type_name: t2,
+                    variant_name: v2,
+                    fields: f2,
+                },
+            ) => t1 == t2 && v1 == v2 && f1 == f2,
+            (Value::Closure(a), Value::Closure(b)) => Arc::ptr_eq(a, b) || a == b,
+            (
+                Value::NativeFn {
+                    name: n1,
+                    arity: a1,
+                    args: args1,
+                },
+                Value::NativeFn {
+                    name: n2,
+                    arity: a2,
+                    args: args2,
+                },
+            ) => n1 == n2 && a1 == a2 && args1 == args2,
+            (Value::HostData(a), Value::HostData(b)) => a == b,
+            _ => false,
+        }
+    }
 }
 
 impl Value {
@@ -239,9 +349,9 @@ impl Value {
             Value::Tuple(elements) => !elements.is_empty(),
             Value::Cons { .. } => true,
             Value::Nil => false,
-            Value::Array(arr) => !arr.borrow().is_empty(),
-            Value::Record(fields) => !fields.borrow().is_empty(),
-            Value::Map(map) => !map.borrow().is_empty(),
+            Value::Array(arr) => !arr.lock().unwrap().is_empty(),
+            Value::Record(fields) => !fields.lock().unwrap().is_empty(),
+            Value::Map(map) => !map.lock().unwrap().is_empty(),
             Value::Variant { .. } => true,
             Value::Closure(_) => true,
             Value::NativeFn { .. } => true,
@@ -280,8 +390,8 @@ impl Value {
     }
 
     /// Attempts to extract an array reference from the value
-    /// Returns Some(`Rc<RefCell<Vec<Value>>>`) if the value is Array, None otherwise
-    pub fn as_array(&self) -> Option<Rc<RefCell<Vec<Value>>>> {
+    /// Returns Some(`Arc<Mutex<Vec<Value>>>`) if the value is Array, None otherwise
+    pub fn as_array(&self) -> Option<Arc<Mutex<Vec<Value>>>> {
         if let Value::Array(arr) = self {
             Some(arr.clone())
         } else {
@@ -290,8 +400,8 @@ impl Value {
     }
 
     /// Attempts to extract a record reference from the value
-    /// Returns Some(`Rc<RefCell<HashMap<String, Value>>>`) if the value is Record, None otherwise
-    pub fn as_record(&self) -> Option<Rc<RefCell<HashMap<String, Value>>>> {
+    /// Returns Some(`Arc<Mutex<HashMap<String, Value>>>`) if the value is Record, None otherwise
+    pub fn as_record(&self) -> Option<Arc<Mutex<HashMap<String, Value>>>> {
         if let Value::Record(fields) = self {
             Some(fields.clone())
         } else {
@@ -304,7 +414,7 @@ impl Value {
     pub fn array_get(&self, index: usize) -> Result<Value, String> {
         match self {
             Value::Array(arr) => {
-                let arr = arr.borrow();
+                let arr = arr.lock().unwrap();
                 arr.get(index)
                     .cloned()
                     .ok_or_else(|| format!("Array index out of bounds: {}", index))
@@ -318,7 +428,7 @@ impl Value {
     pub fn array_set(&self, index: usize, value: Value) -> Result<(), String> {
         match self {
             Value::Array(arr) => {
-                let mut arr = arr.borrow_mut();
+                let mut arr = arr.lock().unwrap();
                 if index < arr.len() {
                     arr[index] = value;
                     Ok(())
@@ -334,7 +444,7 @@ impl Value {
     /// Returns Err if not an array
     pub fn array_length(&self) -> Result<i64, String> {
         match self {
-            Value::Array(arr) => Ok(arr.borrow().len() as i64),
+            Value::Array(arr) => Ok(arr.lock().unwrap().len() as i64),
             _ => Err("Not an array".to_string()),
         }
     }
@@ -344,7 +454,7 @@ impl Value {
     pub fn record_get(&self, field: &str) -> Result<Value, String> {
         match self {
             Value::Record(fields) => {
-                let fields = fields.borrow();
+                let fields = fields.lock().unwrap();
                 fields
                     .get(field)
                     .cloned()
@@ -359,11 +469,11 @@ impl Value {
     pub fn record_update(&self, updates: HashMap<String, Value>) -> Result<Value, String> {
         match self {
             Value::Record(fields) => {
-                let mut new_fields = fields.borrow().clone();
+                let mut new_fields = fields.lock().unwrap().clone();
                 for (key, value) in updates {
                     new_fields.insert(key, value);
                 }
-                Ok(Value::Record(Rc::new(RefCell::new(new_fields))))
+                Ok(Value::Record(Arc::new(Mutex::new(new_fields))))
             }
             _ => Err("Not a record".to_string()),
         }
@@ -373,7 +483,7 @@ impl Value {
     /// Returns Err if not a record
     pub fn record_size(&self) -> Result<usize, String> {
         match self {
-            Value::Record(fields) => Ok(fields.borrow().len()),
+            Value::Record(fields) => Ok(fields.lock().unwrap().len()),
             _ => Err("Not a record".to_string()),
         }
     }
@@ -382,7 +492,7 @@ impl Value {
     /// Returns false if not a record
     pub fn record_has_field(&self, field: &str) -> bool {
         match self {
-            Value::Record(fields) => fields.borrow().contains_key(field),
+            Value::Record(fields) => fields.lock().unwrap().contains_key(field),
             _ => false,
         }
     }
@@ -391,7 +501,7 @@ impl Value {
     /// Returns empty vector if not a record
     pub fn record_field_names(&self) -> Vec<String> {
         match self {
-            Value::Record(fields) => fields.borrow().keys().cloned().collect(),
+            Value::Record(fields) => fields.lock().unwrap().keys().cloned().collect(),
             _ => vec![],
         }
     }
@@ -468,8 +578,8 @@ impl Value {
     }
 
     /// Attempts to extract a closure reference from the value
-    /// Returns Some(`Rc<Closure>`) if the value is Closure, None otherwise
-    pub fn as_closure(&self) -> Option<Rc<Closure>> {
+    /// Returns Some(`Arc<Closure>`) if the value is Closure, None otherwise
+    pub fn as_closure(&self) -> Option<Arc<Closure>> {
         if let Value::Closure(c) = self {
             Some(c.clone())
         } else {
@@ -493,14 +603,15 @@ impl Value {
     }
 
     /// Attempts to extract and downcast HostData to a specific type
-    /// Returns `Some(Ref<T>)` if the value is HostData of type T, None otherwise
-    pub fn as_host_data_of<T: Any + 'static>(&self) -> Option<std::cell::Ref<'_, T>> {
+    /// Returns `Some(LockedHostData<T>)` if the value is HostData of type T, None otherwise
+    pub fn as_host_data_of<T: Any + 'static>(&self) -> Option<LockedHostData<'_, T>> {
         self.as_host_data()?.try_borrow::<T>()
     }
 
     /// Attempts to extract and downcast HostData mutably to a specific type
-    /// Returns `Some(RefMut<T>)` if the value is HostData of type T, None otherwise
-    pub fn as_host_data_of_mut<T: Any + 'static>(&self) -> Option<std::cell::RefMut<'_, T>> {
+    /// Returns `Some(LockedHostDataMut<T>)` if the value is HostData of type T, None otherwise
+    /// Note: With Mutex, both mutable and immutable access use the same lock
+    pub fn as_host_data_of_mut<T: Any + 'static>(&self) -> Option<LockedHostDataMut<'_, T>> {
         self.as_host_data()?.try_borrow_mut::<T>()
     }
 
@@ -580,7 +691,7 @@ impl fmt::Display for Value {
             Value::Array(arr) => {
                 // Pretty-print as [|e1; e2; e3|]
                 write!(f, "[|")?;
-                let arr = arr.borrow();
+                let arr = arr.lock().unwrap();
                 for (i, element) in arr.iter().enumerate() {
                     if i > 0 {
                         write!(f, "; ")?;
@@ -592,7 +703,7 @@ impl fmt::Display for Value {
             Value::Record(fields) => {
                 // Pretty-print as { field1 = value1; field2 = value2 }
                 write!(f, "{{ ")?;
-                let fields = fields.borrow();
+                let fields = fields.lock().unwrap();
                 let mut sorted_fields: Vec<_> = fields.iter().collect();
                 sorted_fields.sort_by_key(|(k, _)| *k);
                 for (i, (field_name, field_value)) in sorted_fields.iter().enumerate() {
@@ -606,7 +717,7 @@ impl fmt::Display for Value {
             Value::Map(map) => {
                 // Pretty-print as Map [ key1 -> value1; key2 -> value2 ]
                 write!(f, "Map [")?;
-                let map = map.borrow();
+                let map = map.lock().unwrap();
                 let mut sorted_entries: Vec<_> = map.iter().collect();
                 sorted_entries.sort_by_key(|(k, _)| *k);
                 for (i, (key, value)) in sorted_entries.iter().enumerate() {
@@ -715,7 +826,7 @@ mod tests {
 
     #[test]
     fn test_type_name_record() {
-        let val = Value::Record(Rc::new(RefCell::new(HashMap::new())));
+        let val = Value::Record(Arc::new(Mutex::new(HashMap::new())));
         assert_eq!(val.type_name(), "record");
     }
 
@@ -837,7 +948,7 @@ mod tests {
 
     #[test]
     fn test_is_truthy_record_empty() {
-        let val = Value::Record(Rc::new(RefCell::new(HashMap::new())));
+        let val = Value::Record(Arc::new(Mutex::new(HashMap::new())));
         assert!(!val.is_truthy());
     }
 
@@ -845,7 +956,7 @@ mod tests {
     fn test_is_truthy_record_non_empty() {
         let mut fields = HashMap::new();
         fields.insert("x".to_string(), Value::Int(1));
-        let val = Value::Record(Rc::new(RefCell::new(fields)));
+        let val = Value::Record(Arc::new(Mutex::new(fields)));
         assert!(val.is_truthy());
     }
 
@@ -875,7 +986,7 @@ mod tests {
 
     #[test]
     fn test_record_empty_construction() {
-        let rec = Value::Record(Rc::new(RefCell::new(HashMap::new())));
+        let rec = Value::Record(Arc::new(Mutex::new(HashMap::new())));
         assert!(rec.is_record());
         assert_eq!(format!("{}", rec), "{  }");
     }
@@ -884,7 +995,7 @@ mod tests {
     fn test_record_single_field() {
         let mut fields = HashMap::new();
         fields.insert("name".to_string(), Value::Str("John".to_string()));
-        let rec = Value::Record(Rc::new(RefCell::new(fields)));
+        let rec = Value::Record(Arc::new(Mutex::new(fields)));
         assert!(rec.is_record());
         assert_eq!(format!("{}", rec), "{ name = John }");
     }
@@ -895,7 +1006,7 @@ mod tests {
         fields.insert("name".to_string(), Value::Str("Alice".to_string()));
         fields.insert("age".to_string(), Value::Int(30));
         fields.insert("active".to_string(), Value::Bool(true));
-        let rec = Value::Record(Rc::new(RefCell::new(fields)));
+        let rec = Value::Record(Arc::new(Mutex::new(fields)));
         assert!(rec.is_record());
         // Fields are sorted alphabetically in display
         let display = format!("{}", rec);
@@ -906,13 +1017,13 @@ mod tests {
 
     #[test]
     fn test_record_type_name() {
-        let rec = Value::Record(Rc::new(RefCell::new(HashMap::new())));
+        let rec = Value::Record(Arc::new(Mutex::new(HashMap::new())));
         assert_eq!(rec.type_name(), "record");
     }
 
     #[test]
     fn test_record_is_record() {
-        let rec = Value::Record(Rc::new(RefCell::new(HashMap::new())));
+        let rec = Value::Record(Arc::new(Mutex::new(HashMap::new())));
         assert!(rec.is_record());
         assert!(!Value::Int(42).is_record());
         assert!(!Value::Tuple(vec![]).is_record());
@@ -922,19 +1033,19 @@ mod tests {
     fn test_record_as_record_success() {
         let mut fields = HashMap::new();
         fields.insert("x".to_string(), Value::Int(1));
-        let rec = Value::Record(Rc::new(RefCell::new(fields)));
+        let rec = Value::Record(Arc::new(Mutex::new(fields)));
         let rec_ref = rec.as_record();
         assert!(rec_ref.is_some());
         let rec_ref = rec_ref.unwrap();
-        assert_eq!(rec_ref.borrow().len(), 1);
-        assert_eq!(*rec_ref.borrow().get("x").unwrap(), Value::Int(1));
+        assert_eq!(rec_ref.lock().unwrap().len(), 1);
+        assert_eq!(*rec_ref.lock().unwrap().get("x").unwrap(), Value::Int(1));
     }
 
     #[test]
     fn test_record_as_record_failure() {
         assert!(Value::Int(42).as_record().is_none());
         assert!(Value::Tuple(vec![]).as_record().is_none());
-        assert!(Value::Array(Rc::new(RefCell::new(vec![])))
+        assert!(Value::Array(Arc::new(Mutex::new(vec![])))
             .as_record()
             .is_none());
     }
@@ -944,7 +1055,7 @@ mod tests {
         let mut fields = HashMap::new();
         fields.insert("name".to_string(), Value::Str("Bob".to_string()));
         fields.insert("age".to_string(), Value::Int(25));
-        let rec = Value::Record(Rc::new(RefCell::new(fields)));
+        let rec = Value::Record(Arc::new(Mutex::new(fields)));
 
         assert_eq!(rec.record_get("name"), Ok(Value::Str("Bob".to_string())));
         assert_eq!(rec.record_get("age"), Ok(Value::Int(25)));
@@ -952,7 +1063,7 @@ mod tests {
 
     #[test]
     fn test_record_get_field_not_found() {
-        let rec = Value::Record(Rc::new(RefCell::new(HashMap::new())));
+        let rec = Value::Record(Arc::new(Mutex::new(HashMap::new())));
         assert!(rec.record_get("missing").is_err());
     }
 
@@ -967,7 +1078,7 @@ mod tests {
         let mut fields = HashMap::new();
         fields.insert("name".to_string(), Value::Str("Alice".to_string()));
         fields.insert("age".to_string(), Value::Int(30));
-        let rec = Value::Record(Rc::new(RefCell::new(fields)));
+        let rec = Value::Record(Arc::new(Mutex::new(fields)));
 
         let mut updates = HashMap::new();
         updates.insert("age".to_string(), Value::Int(31));
@@ -987,7 +1098,7 @@ mod tests {
     fn test_record_update_add_field() {
         let mut fields = HashMap::new();
         fields.insert("x".to_string(), Value::Int(1));
-        let rec = Value::Record(Rc::new(RefCell::new(fields)));
+        let rec = Value::Record(Arc::new(Mutex::new(fields)));
 
         let mut updates = HashMap::new();
         updates.insert("y".to_string(), Value::Int(2));
@@ -1011,13 +1122,13 @@ mod tests {
         fields.insert("a".to_string(), Value::Int(1));
         fields.insert("b".to_string(), Value::Int(2));
         fields.insert("c".to_string(), Value::Int(3));
-        let rec = Value::Record(Rc::new(RefCell::new(fields)));
+        let rec = Value::Record(Arc::new(Mutex::new(fields)));
         assert_eq!(rec.record_size(), Ok(3));
     }
 
     #[test]
     fn test_record_size_empty() {
-        let rec = Value::Record(Rc::new(RefCell::new(HashMap::new())));
+        let rec = Value::Record(Arc::new(Mutex::new(HashMap::new())));
         assert_eq!(rec.record_size(), Ok(0));
     }
 
@@ -1031,7 +1142,7 @@ mod tests {
     fn test_record_has_field_success() {
         let mut fields = HashMap::new();
         fields.insert("name".to_string(), Value::Str("Test".to_string()));
-        let rec = Value::Record(Rc::new(RefCell::new(fields)));
+        let rec = Value::Record(Arc::new(Mutex::new(fields)));
         assert!(rec.record_has_field("name"));
         assert!(!rec.record_has_field("age"));
     }
@@ -1047,7 +1158,7 @@ mod tests {
         let mut fields = HashMap::new();
         fields.insert("name".to_string(), Value::Str("Test".to_string()));
         fields.insert("age".to_string(), Value::Int(25));
-        let rec = Value::Record(Rc::new(RefCell::new(fields)));
+        let rec = Value::Record(Arc::new(Mutex::new(fields)));
         let mut names = rec.record_field_names();
         names.sort();
         assert_eq!(names, vec!["age".to_string(), "name".to_string()]);
@@ -1055,7 +1166,7 @@ mod tests {
 
     #[test]
     fn test_record_field_names_empty() {
-        let rec = Value::Record(Rc::new(RefCell::new(HashMap::new())));
+        let rec = Value::Record(Arc::new(Mutex::new(HashMap::new())));
         assert_eq!(rec.record_field_names(), Vec::<String>::new());
     }
 
@@ -1070,11 +1181,11 @@ mod tests {
         let mut inner_fields = HashMap::new();
         inner_fields.insert("x".to_string(), Value::Int(1));
         inner_fields.insert("y".to_string(), Value::Int(2));
-        let inner = Value::Record(Rc::new(RefCell::new(inner_fields)));
+        let inner = Value::Record(Arc::new(Mutex::new(inner_fields)));
 
         let mut outer_fields = HashMap::new();
         outer_fields.insert("point".to_string(), inner);
-        let outer = Value::Record(Rc::new(RefCell::new(outer_fields)));
+        let outer = Value::Record(Arc::new(Mutex::new(outer_fields)));
 
         let display = format!("{}", outer);
         assert!(display.contains("point = {"));
@@ -1093,7 +1204,7 @@ mod tests {
                 Value::Str("b".to_string()),
             ]),
         );
-        let rec = Value::Record(Rc::new(RefCell::new(fields)));
+        let rec = Value::Record(Arc::new(Mutex::new(fields)));
         assert_eq!(rec.record_size(), Ok(4));
     }
 
@@ -1102,19 +1213,19 @@ mod tests {
         let mut fields1 = HashMap::new();
         fields1.insert("x".to_string(), Value::Int(1));
         fields1.insert("y".to_string(), Value::Int(2));
-        let rec1 = Value::Record(Rc::new(RefCell::new(fields1)));
+        let rec1 = Value::Record(Arc::new(Mutex::new(fields1)));
 
         let mut fields2 = HashMap::new();
         fields2.insert("x".to_string(), Value::Int(1));
         fields2.insert("y".to_string(), Value::Int(2));
-        let rec2 = Value::Record(Rc::new(RefCell::new(fields2)));
+        let rec2 = Value::Record(Arc::new(Mutex::new(fields2)));
 
         assert_eq!(rec1, rec2);
     }
 
     #[test]
     fn test_record_equality_reference() {
-        let fields = Rc::new(RefCell::new(HashMap::new()));
+        let fields = Arc::new(Mutex::new(HashMap::new()));
         let rec1 = Value::Record(fields.clone());
         let rec2 = Value::Record(fields);
         assert_eq!(rec1, rec2);
@@ -1124,11 +1235,11 @@ mod tests {
     fn test_record_inequality_different_values() {
         let mut fields1 = HashMap::new();
         fields1.insert("x".to_string(), Value::Int(1));
-        let rec1 = Value::Record(Rc::new(RefCell::new(fields1)));
+        let rec1 = Value::Record(Arc::new(Mutex::new(fields1)));
 
         let mut fields2 = HashMap::new();
         fields2.insert("x".to_string(), Value::Int(2));
-        let rec2 = Value::Record(Rc::new(RefCell::new(fields2)));
+        let rec2 = Value::Record(Arc::new(Mutex::new(fields2)));
 
         assert_ne!(rec1, rec2);
     }
@@ -1137,11 +1248,11 @@ mod tests {
     fn test_record_inequality_different_fields() {
         let mut fields1 = HashMap::new();
         fields1.insert("x".to_string(), Value::Int(1));
-        let rec1 = Value::Record(Rc::new(RefCell::new(fields1)));
+        let rec1 = Value::Record(Arc::new(Mutex::new(fields1)));
 
         let mut fields2 = HashMap::new();
         fields2.insert("y".to_string(), Value::Int(1));
-        let rec2 = Value::Record(Rc::new(RefCell::new(fields2)));
+        let rec2 = Value::Record(Arc::new(Mutex::new(fields2)));
 
         assert_ne!(rec1, rec2);
     }
@@ -1150,7 +1261,7 @@ mod tests {
     fn test_record_clone() {
         let mut fields = HashMap::new();
         fields.insert("x".to_string(), Value::Int(1));
-        let rec1 = Value::Record(Rc::new(RefCell::new(fields)));
+        let rec1 = Value::Record(Arc::new(Mutex::new(fields)));
         let rec2 = rec1.clone();
         assert_eq!(rec1, rec2);
 
@@ -1159,7 +1270,7 @@ mod tests {
         updates.insert("x".to_string(), Value::Int(99));
         rec1.as_record()
             .unwrap()
-            .borrow_mut()
+            .lock().unwrap()
             .insert("x".to_string(), Value::Int(99));
         assert_eq!(rec2.record_get("x"), Ok(Value::Int(99)));
     }
@@ -1680,21 +1791,21 @@ mod tests {
 
     #[test]
     fn test_array_empty_construction() {
-        let arr = Value::Array(Rc::new(RefCell::new(vec![])));
+        let arr = Value::Array(Arc::new(Mutex::new(vec![])));
         assert!(arr.is_array());
         assert_eq!(format!("{}", arr), "[||]");
     }
 
     #[test]
     fn test_array_single_element() {
-        let arr = Value::Array(Rc::new(RefCell::new(vec![Value::Int(42)])));
+        let arr = Value::Array(Arc::new(Mutex::new(vec![Value::Int(42)])));
         assert!(arr.is_array());
         assert_eq!(format!("{}", arr), "[|42|]");
     }
 
     #[test]
     fn test_array_multiple_elements() {
-        let arr = Value::Array(Rc::new(RefCell::new(vec![
+        let arr = Value::Array(Arc::new(Mutex::new(vec![
             Value::Int(1),
             Value::Int(2),
             Value::Int(3),
@@ -1704,13 +1815,13 @@ mod tests {
 
     #[test]
     fn test_array_type_name() {
-        let arr = Value::Array(Rc::new(RefCell::new(vec![Value::Int(1)])));
+        let arr = Value::Array(Arc::new(Mutex::new(vec![Value::Int(1)])));
         assert_eq!(arr.type_name(), "array");
     }
 
     #[test]
     fn test_array_is_array() {
-        let arr = Value::Array(Rc::new(RefCell::new(vec![])));
+        let arr = Value::Array(Arc::new(Mutex::new(vec![])));
         assert!(arr.is_array());
         assert!(!Value::Int(42).is_array());
         assert!(!Value::Nil.is_array());
@@ -1718,12 +1829,12 @@ mod tests {
 
     #[test]
     fn test_array_as_array_success() {
-        let arr = Value::Array(Rc::new(RefCell::new(vec![Value::Int(1), Value::Int(2)])));
+        let arr = Value::Array(Arc::new(Mutex::new(vec![Value::Int(1), Value::Int(2)])));
         let arr_ref = arr.as_array();
         assert!(arr_ref.is_some());
         let arr_ref = arr_ref.unwrap();
-        assert_eq!(arr_ref.borrow().len(), 2);
-        assert_eq!(arr_ref.borrow()[0], Value::Int(1));
+        assert_eq!(arr_ref.lock().unwrap().len(), 2);
+        assert_eq!(arr_ref.lock().unwrap()[0], Value::Int(1));
     }
 
     #[test]
@@ -1735,7 +1846,7 @@ mod tests {
 
     #[test]
     fn test_array_get_success() {
-        let arr = Value::Array(Rc::new(RefCell::new(vec![
+        let arr = Value::Array(Arc::new(Mutex::new(vec![
             Value::Int(10),
             Value::Int(20),
             Value::Int(30),
@@ -1747,7 +1858,7 @@ mod tests {
 
     #[test]
     fn test_array_get_out_of_bounds() {
-        let arr = Value::Array(Rc::new(RefCell::new(vec![Value::Int(1)])));
+        let arr = Value::Array(Arc::new(Mutex::new(vec![Value::Int(1)])));
         assert!(arr.array_get(1).is_err());
         assert!(arr.array_get(10).is_err());
     }
@@ -1760,7 +1871,7 @@ mod tests {
 
     #[test]
     fn test_array_set_success() {
-        let arr = Value::Array(Rc::new(RefCell::new(vec![
+        let arr = Value::Array(Arc::new(Mutex::new(vec![
             Value::Int(1),
             Value::Int(2),
             Value::Int(3),
@@ -1771,7 +1882,7 @@ mod tests {
 
     #[test]
     fn test_array_set_out_of_bounds() {
-        let arr = Value::Array(Rc::new(RefCell::new(vec![Value::Int(1)])));
+        let arr = Value::Array(Arc::new(Mutex::new(vec![Value::Int(1)])));
         assert!(arr.array_set(1, Value::Int(2)).is_err());
     }
 
@@ -1786,10 +1897,10 @@ mod tests {
 
     #[test]
     fn test_array_length_success() {
-        let arr1 = Value::Array(Rc::new(RefCell::new(vec![])));
+        let arr1 = Value::Array(Arc::new(Mutex::new(vec![])));
         assert_eq!(arr1.array_length(), Ok(0));
 
-        let arr2 = Value::Array(Rc::new(RefCell::new(vec![
+        let arr2 = Value::Array(Arc::new(Mutex::new(vec![
             Value::Int(1),
             Value::Int(2),
             Value::Int(3),
@@ -1805,14 +1916,14 @@ mod tests {
 
     #[test]
     fn test_array_equality_structural() {
-        let arr1 = Value::Array(Rc::new(RefCell::new(vec![Value::Int(1), Value::Int(2)])));
-        let arr2 = Value::Array(Rc::new(RefCell::new(vec![Value::Int(1), Value::Int(2)])));
+        let arr1 = Value::Array(Arc::new(Mutex::new(vec![Value::Int(1), Value::Int(2)])));
+        let arr2 = Value::Array(Arc::new(Mutex::new(vec![Value::Int(1), Value::Int(2)])));
         assert_eq!(arr1, arr2);
     }
 
     #[test]
     fn test_array_equality_reference() {
-        let arr_rc = Rc::new(RefCell::new(vec![Value::Int(1), Value::Int(2)]));
+        let arr_rc = Arc::new(Mutex::new(vec![Value::Int(1), Value::Int(2)]));
         let arr1 = Value::Array(arr_rc.clone());
         let arr2 = Value::Array(arr_rc);
         assert_eq!(arr1, arr2);
@@ -1820,21 +1931,21 @@ mod tests {
 
     #[test]
     fn test_array_inequality() {
-        let arr1 = Value::Array(Rc::new(RefCell::new(vec![Value::Int(1), Value::Int(2)])));
-        let arr2 = Value::Array(Rc::new(RefCell::new(vec![Value::Int(1), Value::Int(3)])));
+        let arr1 = Value::Array(Arc::new(Mutex::new(vec![Value::Int(1), Value::Int(2)])));
+        let arr2 = Value::Array(Arc::new(Mutex::new(vec![Value::Int(1), Value::Int(3)])));
         assert_ne!(arr1, arr2);
     }
 
     #[test]
     fn test_array_nested() {
-        let inner = Value::Array(Rc::new(RefCell::new(vec![Value::Int(1), Value::Int(2)])));
-        let outer = Value::Array(Rc::new(RefCell::new(vec![inner])));
+        let inner = Value::Array(Arc::new(Mutex::new(vec![Value::Int(1), Value::Int(2)])));
+        let outer = Value::Array(Arc::new(Mutex::new(vec![inner])));
         assert_eq!(format!("{}", outer), "[|[|1; 2|]|]");
     }
 
     #[test]
     fn test_array_mixed_types() {
-        let arr = Value::Array(Rc::new(RefCell::new(vec![
+        let arr = Value::Array(Arc::new(Mutex::new(vec![
             Value::Int(42),
             Value::Str("hello".to_string()),
             Value::Bool(true),
@@ -1844,16 +1955,16 @@ mod tests {
 
     #[test]
     fn test_array_is_truthy() {
-        let arr1 = Value::Array(Rc::new(RefCell::new(vec![])));
+        let arr1 = Value::Array(Arc::new(Mutex::new(vec![])));
         assert!(!arr1.is_truthy());
 
-        let arr2 = Value::Array(Rc::new(RefCell::new(vec![Value::Int(1)])));
+        let arr2 = Value::Array(Arc::new(Mutex::new(vec![Value::Int(1)])));
         assert!(arr2.is_truthy());
     }
 
     #[test]
     fn test_array_clone() {
-        let arr1 = Value::Array(Rc::new(RefCell::new(vec![Value::Int(1), Value::Int(2)])));
+        let arr1 = Value::Array(Arc::new(Mutex::new(vec![Value::Int(1), Value::Int(2)])));
         let arr2 = arr1.clone();
         assert_eq!(arr1, arr2);
 
@@ -1864,7 +1975,7 @@ mod tests {
 
     #[test]
     fn test_array_mutation() {
-        let arr = Value::Array(Rc::new(RefCell::new(vec![
+        let arr = Value::Array(Arc::new(Mutex::new(vec![
             Value::Int(1),
             Value::Int(2),
             Value::Int(3),
@@ -1933,7 +2044,7 @@ mod tests {
         assert!(variant.is_variant());
         assert!(!Value::Int(42).is_variant());
         assert!(!Value::Tuple(vec![]).is_variant());
-        assert!(!Value::Record(Rc::new(RefCell::new(HashMap::new()))).is_variant());
+        assert!(!Value::Record(Arc::new(Mutex::new(HashMap::new()))).is_variant());
     }
 
     #[test]
@@ -1956,7 +2067,7 @@ mod tests {
     fn test_variant_as_variant_failure() {
         assert!(Value::Int(42).as_variant().is_none());
         assert!(Value::Tuple(vec![]).as_variant().is_none());
-        assert!(Value::Record(Rc::new(RefCell::new(HashMap::new())))
+        assert!(Value::Record(Arc::new(Mutex::new(HashMap::new())))
             .as_variant()
             .is_none());
     }

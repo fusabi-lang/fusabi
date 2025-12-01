@@ -14,15 +14,15 @@ pub mod net;
 
 use crate::value::Value;
 use crate::vm::{Vm, VmError};
-use std::cell::RefCell;
+use std::sync::Mutex;
 use std::collections::HashMap;
-use std::rc::Rc;
+use std::sync::Arc;
 
 /// Register all standard library functions into the VM
 pub fn register_stdlib(vm: &mut Vm) {
     // 1. Register functions in HostRegistry
     {
-        let mut registry = vm.host_registry.borrow_mut();
+        let mut registry = vm.host_registry.lock().unwrap();
 
         // List functions
         registry.register("List.length", |_vm, args| {
@@ -201,7 +201,7 @@ pub fn register_stdlib(vm: &mut Vm) {
     list_fields.insert("map".to_string(), native("List.map", 2));
     vm.globals.insert(
         "List".to_string(),
-        Value::Record(Rc::new(RefCell::new(list_fields))),
+        Value::Record(Arc::new(Mutex::new(list_fields))),
     );
 
     // String Module
@@ -218,7 +218,7 @@ pub fn register_stdlib(vm: &mut Vm) {
     string_fields.insert("format".to_string(), native("String.format", 2));
     vm.globals.insert(
         "String".to_string(),
-        Value::Record(Rc::new(RefCell::new(string_fields))),
+        Value::Record(Arc::new(Mutex::new(string_fields))),
     );
 
     // Register sprintf as a global alias for String.format
@@ -238,7 +238,7 @@ pub fn register_stdlib(vm: &mut Vm) {
     map_fields.insert("toList".to_string(), native("Map.toList", 1));
     vm.globals.insert(
         "Map".to_string(),
-        Value::Record(Rc::new(RefCell::new(map_fields))),
+        Value::Record(Arc::new(Mutex::new(map_fields))),
     );
 
     // Option Module
@@ -254,7 +254,7 @@ pub fn register_stdlib(vm: &mut Vm) {
     option_fields.insert("orElse".to_string(), native("Option.orElse", 2));
     vm.globals.insert(
         "Option".to_string(),
-        Value::Record(Rc::new(RefCell::new(option_fields))),
+        Value::Record(Arc::new(Mutex::new(option_fields))),
     );
 
     // Register Option constructors as globals
@@ -273,7 +273,7 @@ pub fn register_stdlib(vm: &mut Vm) {
         );
         vm.globals.insert(
             "Json".to_string(),
-            Value::Record(Rc::new(RefCell::new(json_fields))),
+            Value::Record(Arc::new(Mutex::new(json_fields))),
         );
     }
 
@@ -285,7 +285,7 @@ pub fn register_stdlib(vm: &mut Vm) {
         osc_fields.insert("send".to_string(), native("Osc.send", 3));
         vm.globals.insert(
             "Osc".to_string(),
-            Value::Record(Rc::new(RefCell::new(osc_fields))),
+            Value::Record(Arc::new(Mutex::new(osc_fields))),
         );
     }
 }
@@ -339,12 +339,12 @@ mod tests {
         register_stdlib(&mut vm);
 
         // Check HostRegistry
-        assert!(vm.host_registry.borrow().has_function("List.length"));
+        assert!(vm.host_registry.lock().unwrap().has_function("List.length"));
 
         // Check Globals
         assert!(vm.globals.contains_key("List"));
         if let Some(Value::Record(r)) = vm.globals.get("List") {
-            assert!(r.borrow().contains_key("length"));
+            assert!(r.lock().unwrap().contains_key("length"));
         } else {
             panic!("List global is not a record");
         }
@@ -356,19 +356,19 @@ mod tests {
         register_stdlib(&mut vm);
 
         // Check all Option functions are registered
-        assert!(vm.host_registry.borrow().has_function("Option.isSome"));
-        assert!(vm.host_registry.borrow().has_function("Option.isNone"));
-        assert!(vm.host_registry.borrow().has_function("Option.defaultValue"));
-        assert!(vm.host_registry.borrow().has_function("Option.defaultWith"));
-        assert!(vm.host_registry.borrow().has_function("Option.map"));
-        assert!(vm.host_registry.borrow().has_function("Option.bind"));
-        assert!(vm.host_registry.borrow().has_function("Option.iter"));
-        assert!(vm.host_registry.borrow().has_function("Option.map2"));
-        assert!(vm.host_registry.borrow().has_function("Option.orElse"));
+        assert!(vm.host_registry.lock().unwrap().has_function("Option.isSome"));
+        assert!(vm.host_registry.lock().unwrap().has_function("Option.isNone"));
+        assert!(vm.host_registry.lock().unwrap().has_function("Option.defaultValue"));
+        assert!(vm.host_registry.lock().unwrap().has_function("Option.defaultWith"));
+        assert!(vm.host_registry.lock().unwrap().has_function("Option.map"));
+        assert!(vm.host_registry.lock().unwrap().has_function("Option.bind"));
+        assert!(vm.host_registry.lock().unwrap().has_function("Option.iter"));
+        assert!(vm.host_registry.lock().unwrap().has_function("Option.map2"));
+        assert!(vm.host_registry.lock().unwrap().has_function("Option.orElse"));
 
         // Check constructors
-        assert!(vm.host_registry.borrow().has_function("Some"));
-        assert!(vm.host_registry.borrow().has_function("None"));
+        assert!(vm.host_registry.lock().unwrap().has_function("Some"));
+        assert!(vm.host_registry.lock().unwrap().has_function("None"));
     }
 
     #[test]
@@ -379,7 +379,7 @@ mod tests {
         // Check Option module global
         assert!(vm.globals.contains_key("Option"));
         if let Some(Value::Record(r)) = vm.globals.get("Option") {
-            let borrowed = r.borrow();
+            let borrowed = r.lock().unwrap();
             assert!(borrowed.contains_key("isSome"));
             assert!(borrowed.contains_key("isNone"));
             assert!(borrowed.contains_key("defaultValue"));

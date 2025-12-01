@@ -1,6 +1,6 @@
 [package]
 name = "fusabi-vm"
-version = "0.16.0"
+version = "0.17.0"
 edition = "2021"
 description = "High-performance bytecode VM for Fusabi scripting language."
 repository = "https://github.com/fusabi-lang/fusabi"
@@ -18,6 +18,7 @@ rosc = { version = "0.10", optional = true }
 [dev-dependencies]
 criterion = "0.5"
 fusabi = { path = "../fusabi" }
+fusabi-frontend = { path = "../fusabi-frontend" }
 
 [[bench]]
 name = "simple_bench"

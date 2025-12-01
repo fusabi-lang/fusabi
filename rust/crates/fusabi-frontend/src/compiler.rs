@@ -47,7 +47,7 @@ use fusabi_vm::instruction::Instruction;
 use fusabi_vm::value::Value;
 use std::collections::HashMap;
 use std::fmt;
-use std::rc::Rc;
+use std::sync::Arc;
 
 /// Compilation errors
 #[derive(Debug, Clone, PartialEq)]
@@ -939,7 +939,7 @@ impl Compiler {
         // For now, we don't support upvalue capture in the compiler (Phase 2 extension)
         // We assume no upvalues.
         let closure = Closure::with_arity(lambda_compiler.chunk, 1);
-        let closure_val = Value::Closure(Rc::new(closure));
+        let closure_val = Value::Closure(Arc::new(closure));
 
         // Store prototype in constants
         let const_idx = self.add_constant(closure_val)?;

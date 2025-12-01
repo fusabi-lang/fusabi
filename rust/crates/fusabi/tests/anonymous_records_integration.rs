@@ -14,7 +14,7 @@ fn test_empty_anonymous_record() {
     let result = run_source(source).unwrap();
     assert!(matches!(result, Value::Record(_)));
     if let Value::Record(rec) = result {
-        assert_eq!(rec.borrow().len(), 0);
+        assert_eq!(rec.lock().unwrap().len(), 0);
     }
 }
 
@@ -24,7 +24,7 @@ fn test_single_field_anonymous_record() {
     let result = run_source(source).unwrap();
     assert!(matches!(result, Value::Record(_)));
     if let Value::Record(rec) = result {
-        let borrowed = rec.borrow();
+        let borrowed = rec.lock().unwrap();
         assert_eq!(borrowed.len(), 1);
         assert_eq!(
             *borrowed.get("name").unwrap(),
@@ -39,7 +39,7 @@ fn test_multi_field_anonymous_record() {
     let result = run_source(source).unwrap();
     assert!(matches!(result, Value::Record(_)));
     if let Value::Record(rec) = result {
-        let borrowed = rec.borrow();
+        let borrowed = rec.lock().unwrap();
         assert_eq!(borrowed.len(), 3);
         assert_eq!(
             *borrowed.get("name").unwrap(),
@@ -55,7 +55,7 @@ fn test_anonymous_record_with_computed_fields() {
     let source = r#"{| x = 5 + 3; y = 10 * 2; sum = (5 + 3) + (10 * 2) |}"#;
     let result = run_source(source).unwrap();
     if let Value::Record(rec) = result {
-        let borrowed = rec.borrow();
+        let borrowed = rec.lock().unwrap();
         assert_eq!(*borrowed.get("x").unwrap(), Value::Int(8));
         assert_eq!(*borrowed.get("y").unwrap(), Value::Int(20));
         assert_eq!(*borrowed.get("sum").unwrap(), Value::Int(28));
@@ -67,7 +67,7 @@ fn test_anonymous_record_trailing_semicolon() {
     let source = r#"{| x = 1; y = 2; |}"#;
     let result = run_source(source).unwrap();
     if let Value::Record(rec) = result {
-        let borrowed = rec.borrow();
+        let borrowed = rec.lock().unwrap();
         assert_eq!(borrowed.len(), 2);
         assert_eq!(*borrowed.get("x").unwrap(), Value::Int(1));
         assert_eq!(*borrowed.get("y").unwrap(), Value::Int(2));
@@ -159,7 +159,7 @@ fn test_nested_anonymous_record_literal() {
     "#;
     let result = run_source(source).unwrap();
     if let Value::Record(rec) = result {
-        let borrowed = rec.borrow();
+        let borrowed = rec.lock().unwrap();
         assert!(matches!(borrowed.get("user").unwrap(), Value::Record(_)));
         assert!(matches!(
             borrowed.get("metadata").unwrap(),
@@ -239,7 +239,7 @@ fn test_function_returning_anonymous_record() {
     "#;
     let result = run_source(source).unwrap();
     if let Value::Record(rec) = result {
-        let borrowed = rec.borrow();
+        let borrowed = rec.lock().unwrap();
         assert_eq!(
             *borrowed.get("name").unwrap(),
             Value::Str("Kelly".to_string())
@@ -399,7 +399,7 @@ fn test_anonymous_record_with_string_field_names() {
     "#;
     let result = run_source(source).unwrap();
     if let Value::Record(rec) = result {
-        let borrowed = rec.borrow();
+        let borrowed = rec.lock().unwrap();
         assert_eq!(borrowed.len(), 2);
         assert!(borrowed.contains_key("firstName"));
         assert!(borrowed.contains_key("lastName"));
@@ -450,7 +450,7 @@ fn test_anonymous_record_no_semicolons() {
     let source = r#"{| x = 1 |}"#;
     let result = run_source(source).unwrap();
     if let Value::Record(rec) = result {
-        let borrowed = rec.borrow();
+        let borrowed = rec.lock().unwrap();
         assert_eq!(borrowed.len(), 1);
         assert_eq!(*borrowed.get("x").unwrap(), Value::Int(1));
     }
@@ -467,7 +467,7 @@ fn test_anonymous_record_multiline() {
     "#;
     let result = run_source(source).unwrap();
     if let Value::Record(rec) = result {
-        let borrowed = rec.borrow();
+        let borrowed = rec.lock().unwrap();
         assert_eq!(borrowed.len(), 3);
     }
 }
@@ -479,7 +479,7 @@ fn test_anonymous_record_inline_expressions() {
     "#;
     let result = run_source(source).unwrap();
     if let Value::Record(rec) = result {
-        let borrowed = rec.borrow();
+        let borrowed = rec.lock().unwrap();
         assert_eq!(*borrowed.get("result").unwrap(), Value::Int(1));
         assert_eq!(*borrowed.get("flag").unwrap(), Value::Bool(true));
     }

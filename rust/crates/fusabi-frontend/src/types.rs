@@ -33,6 +33,7 @@
 use std::collections::{HashMap, HashSet};
 use std::fmt;
 use std::rc::Rc;
+use std::sync::Arc;
 
 /// Type variable identifier.
 ///

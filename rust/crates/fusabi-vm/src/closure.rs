@@ -3,9 +3,9 @@
 
 use crate::chunk::Chunk;
 use crate::value::Value;
-use std::cell::RefCell;
+use std::sync::Mutex;
 use std::fmt;
-use std::rc::Rc;
+use std::sync::Arc;
 
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
@@ -89,7 +89,7 @@ pub struct Closure {
     pub chunk: Chunk,
     /// Captured upvalues from enclosing scopes
     #[cfg_attr(feature = "serde", serde(skip))] // Runtime state, not serialized for now
-    pub upvalues: Vec<Rc<RefCell<Upvalue>>>,
+    pub upvalues: Vec<Arc<Mutex<Upvalue>>>,
     /// Number of parameters the function expects
     pub arity: u8,
     /// Function name (for debugging)
@@ -138,12 +138,12 @@ impl Closure {
     }
 
     /// Add an upvalue to this closure
-    pub fn add_upvalue(&mut self, upvalue: Rc<RefCell<Upvalue>>) {
+    pub fn add_upvalue(&mut self, upvalue: Arc<Mutex<Upvalue>>) {
         self.upvalues.push(upvalue);
     }
 
     /// Get an upvalue by index
-    pub fn get_upvalue(&self, index: usize) -> Option<Rc<RefCell<Upvalue>>> {
+    pub fn get_upvalue(&self, index: usize) -> Option<Arc<Mutex<Upvalue>>> {
         self.upvalues.get(index).cloned()
     }
 
@@ -277,7 +277,7 @@ mod tests {
         let chunk = ChunkBuilder::new().build();
         let mut closure = Closure::new(chunk);
 
-        let upvalue = Rc::new(RefCell::new(Upvalue::new_open(5)));
+        let upvalue = Arc::new(Mutex::new(Upvalue::new_open(5)));
         closure.add_upvalue(upvalue);
 
         assert_eq!(closure.upvalue_count(), 1);
@@ -288,11 +288,11 @@ mod tests {
         let chunk = ChunkBuilder::new().build();
         let mut closure = Closure::new(chunk);
 
-        let upvalue = Rc::new(RefCell::new(Upvalue::new_open(5)));
+        let upvalue = Arc::new(Mutex::new(Upvalue::new_open(5)));
         closure.add_upvalue(upvalue.clone());
 
         let retrieved = closure.get_upvalue(0).unwrap();
-        assert_eq!(*retrieved.borrow(), Upvalue::new_open(5));
+        assert_eq!(*retrieved.lock().unwrap(), Upvalue::new_open(5));
     }
 
     #[test]
@@ -309,9 +309,9 @@ mod tests {
         let chunk = ChunkBuilder::new().build();
         let mut closure = Closure::new(chunk);
 
-        let uv1 = Rc::new(RefCell::new(Upvalue::new_open(1)));
-        let uv2 = Rc::new(RefCell::new(Upvalue::new_open(2)));
-        let uv3 = Rc::new(RefCell::new(Upvalue::new_closed(Value::Int(42))));
+        let uv1 = Arc::new(Mutex::new(Upvalue::new_open(1)));
+        let uv2 = Arc::new(Mutex::new(Upvalue::new_open(2)));
+        let uv3 = Arc::new(Mutex::new(Upvalue::new_closed(Value::Int(42))));
 
         closure.add_upvalue(uv1);
         closure.add_upvalue(uv2);
@@ -319,15 +319,15 @@ mod tests {
 
         assert_eq!(closure.upvalue_count(), 3);
         assert_eq!(
-            *closure.get_upvalue(0).unwrap().borrow(),
+            *closure.get_upvalue(0).unwrap().lock().unwrap(),
             Upvalue::new_open(1)
         );
         assert_eq!(
-            *closure.get_upvalue(1).unwrap().borrow(),
+            *closure.get_upvalue(1).unwrap().lock().unwrap(),
             Upvalue::new_open(2)
         );
         assert_eq!(
-            *closure.get_upvalue(2).unwrap().borrow(),
+            *closure.get_upvalue(2).unwrap().lock().unwrap(),
             Upvalue::new_closed(Value::Int(42))
         );
     }

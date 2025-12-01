@@ -1,12 +1,12 @@
 // Fusabi Map Standard Library
 use crate::value::Value;
 use crate::vm::VmError;
-use std::cell::RefCell;
+use std::sync::Mutex;
 use std::collections::HashMap;
-use std::rc::Rc;
+use std::sync::Arc;
 
 pub fn map_empty(_unit: &Value) -> Result<Value, VmError> {
-    Ok(Value::Map(Rc::new(RefCell::new(HashMap::new()))))
+    Ok(Value::Map(Arc::new(Mutex::new(HashMap::new()))))
 }
 
 pub fn map_add(key: &Value, value: &Value, map: &Value) -> Result<Value, VmError> {
@@ -16,9 +16,9 @@ pub fn map_add(key: &Value, value: &Value, map: &Value) -> Result<Value, VmError
     })?;
     match map {
         Value::Map(m) => {
-            let mut new_map = m.borrow().clone();
+            let mut new_map = m.lock().unwrap().clone();
             new_map.insert(key_str.to_string(), value.clone());
-            Ok(Value::Map(Rc::new(RefCell::new(new_map))))
+            Ok(Value::Map(Arc::new(Mutex::new(new_map))))
         }
         _ => Err(VmError::TypeMismatch {
             expected: "map",
@@ -34,9 +34,9 @@ pub fn map_remove(key: &Value, map: &Value) -> Result<Value, VmError> {
     })?;
     match map {
         Value::Map(m) => {
-            let mut new_map = m.borrow().clone();
+            let mut new_map = m.lock().unwrap().clone();
             new_map.remove(key_str);
-            Ok(Value::Map(Rc::new(RefCell::new(new_map))))
+            Ok(Value::Map(Arc::new(Mutex::new(new_map))))
         }
         _ => Err(VmError::TypeMismatch {
             expected: "map",
@@ -52,7 +52,7 @@ pub fn map_find(key: &Value, map: &Value) -> Result<Value, VmError> {
     })?;
     match map {
         Value::Map(m) => {
-            let m = m.borrow();
+            let m = m.lock().unwrap();
             m.get(key_str).cloned().ok_or_else(|| {
                 VmError::Runtime(format!("Map key not found: {}", key_str))
             })
@@ -71,7 +71,7 @@ pub fn map_try_find(key: &Value, map: &Value) -> Result<Value, VmError> {
     })?;
     match map {
         Value::Map(m) => {
-            let m = m.borrow();
+            let m = m.lock().unwrap();
             match m.get(key_str) {
                 Some(value) => Ok(Value::Variant {
                     type_name: "Option".to_string(),
@@ -99,7 +99,7 @@ pub fn map_contains_key(key: &Value, map: &Value) -> Result<Value, VmError> {
     })?;
     match map {
         Value::Map(m) => {
-            let m = m.borrow();
+            let m = m.lock().unwrap();
             Ok(Value::Bool(m.contains_key(key_str)))
         }
         _ => Err(VmError::TypeMismatch {
@@ -111,7 +111,7 @@ pub fn map_contains_key(key: &Value, map: &Value) -> Result<Value, VmError> {
 
 pub fn map_is_empty(map: &Value) -> Result<Value, VmError> {
     match map {
-        Value::Map(m) => Ok(Value::Bool(m.borrow().is_empty())),
+        Value::Map(m) => Ok(Value::Bool(m.lock().unwrap().is_empty())),
         _ => Err(VmError::TypeMismatch {
             expected: "map",
             got: map.type_name(),
@@ -121,7 +121,7 @@ pub fn map_is_empty(map: &Value) -> Result<Value, VmError> {
 
 pub fn map_count(map: &Value) -> Result<Value, VmError> {
     match map {
-        Value::Map(m) => Ok(Value::Int(m.borrow().len() as i64)),
+        Value::Map(m) => Ok(Value::Int(m.lock().unwrap().len() as i64)),
         _ => Err(VmError::TypeMismatch {
             expected: "map",
             got: map.type_name(),
@@ -162,13 +162,13 @@ pub fn map_of_list(list: &Value) -> Result<Value, VmError> {
             }
         }
     }
-    Ok(Value::Map(Rc::new(RefCell::new(map))))
+    Ok(Value::Map(Arc::new(Mutex::new(map))))
 }
 
 pub fn map_to_list(map: &Value) -> Result<Value, VmError> {
     match map {
         Value::Map(m) => {
-            let m = m.borrow();
+            let m = m.lock().unwrap();
             let mut entries: Vec<_> = m
                 .iter()
                 .map(|(k, v)| Value::Tuple(vec![Value::Str(k.clone()), v.clone()]))

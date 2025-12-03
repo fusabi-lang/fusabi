@@ -1,5 +1,5 @@
 // Commander - A TUI File Explorer for Fusabi
-// Demonstrates Events, TerminalControl, TerminalInfo, Process, List, and String modules
+// Demonstrates Events, TerminalControl, TerminalInfo, Process, Console, List, and String modules
 
 // ============================================================================
 // MODEL
@@ -136,22 +136,23 @@ let rec eventLoop model =
         // Render current state
         render model
 
-        // Simulate getting input (in a real TUI, this would be async)
-        // For this demo, we'll show the concept
-        printfn (sprintf "\nEnter command (j/k/enter/q): ")
+        // Get real user input
+        Console.write "Enter command (j/k/enter/q): "
+        let input = Console.readLine ()
 
-        // In a real implementation, we'd have:
-        // let input = Console.ReadLine()
-        // let eventName = sprintf "key:%s" input
-        // let newModel = update eventName model
-        // eventLoop newModel
+        // Convert input to event name
+        let eventName =
+            match input with
+            | "j" -> "key:j"
+            | "k" -> "key:k"
+            | "enter" -> "key:enter"
+            | "" -> "key:enter"   // Empty line = Enter
+            | "q" -> "key:q"
+            | other -> sprintf "key:%s" other
 
-        // For demo purposes, show how it would work
-        let demoCommands = ["key:j"; "key:j"; "key:k"; "key:enter"; "key:q"]
-        let newModel = List.fold (fun m event -> update event m) model demoCommands
-
-        TerminalControl.showToast "Demo complete - in real usage, this would be interactive"
-        newModel
+        // Update model and continue loop
+        let newModel = update eventName model
+        eventLoop newModel
     else
         printfn (sprintf "\nExiting Commander...")
         model

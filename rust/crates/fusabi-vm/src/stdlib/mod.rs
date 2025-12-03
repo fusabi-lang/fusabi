@@ -2,6 +2,7 @@
 // Provides built-in functions for List, String, Map, Array, and Option operations
 
 pub mod array;
+pub mod commands;
 pub mod list;
 pub mod map;
 pub mod option;
@@ -9,6 +10,7 @@ pub mod math;
 pub mod result;
 pub mod print;
 pub mod string;
+pub mod terminal_info;
 
 #[cfg(feature = "json")]
 pub mod json;
@@ -331,6 +333,14 @@ pub fn register_stdlib(vm: &mut Vm) {
             registry.register("Osc.client", net::osc::osc_client);
             registry.register("Osc.send", net::osc::osc_send);
         }
+
+        // Commands functions
+        registry.register("Commands.register", commands::commands_register);
+        registry.register("Commands.registerMany", commands::commands_register_many);
+        registry.register("Commands.unregister", commands::commands_unregister);
+        registry.register("Commands.list", commands::commands_list);
+        registry.register("Commands.getById", commands::commands_get_by_id);
+        registry.register("Commands.invoke", commands::commands_invoke);
     }
 
     // 2. Populate Globals with Module Records
@@ -515,6 +525,19 @@ pub fn register_stdlib(vm: &mut Vm) {
             Value::Record(Arc::new(Mutex::new(osc_fields))),
         );
     }
+
+    // Commands Module
+    let mut commands_fields = HashMap::new();
+    commands_fields.insert("register".to_string(), native("Commands.register", 1));
+    commands_fields.insert("registerMany".to_string(), native("Commands.registerMany", 1));
+    commands_fields.insert("unregister".to_string(), native("Commands.unregister", 1));
+    commands_fields.insert("list".to_string(), native("Commands.list", 1));
+    commands_fields.insert("getById".to_string(), native("Commands.getById", 1));
+    commands_fields.insert("invoke".to_string(), native("Commands.invoke", 1));
+    vm.globals.insert(
+        "Commands".to_string(),
+        Value::Record(Arc::new(Mutex::new(commands_fields))),
+    );
 }
 
 fn wrap_unary<F>(args: &[Value], f: F) -> Result<Value, VmError>

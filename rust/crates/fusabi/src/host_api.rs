@@ -170,6 +170,8 @@ impl FusabiEngine {
 
         // Register standard library functions and modules
         fusabi_vm::stdlib::register_stdlib(&mut vm);
+        // Override Script.eval with real implementation that has compiler access
+        crate::register_script_eval_override(&mut vm);
 
         let host_registry = vm.host_registry.clone();
 

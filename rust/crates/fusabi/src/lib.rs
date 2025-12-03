@@ -79,7 +79,7 @@
 //! ```
 
 use fusabi_frontend::{Compiler, Lexer, Parser};
-use fusabi_vm::{deserialize_chunk, serialize_chunk, Chunk, Vm, FZB_MAGIC};
+use fusabi_vm::{deserialize_chunk, serialize_chunk, Chunk, Vm, VmError, FZB_MAGIC};
 use std::error::Error;
 use std::fmt;
 use std::fs;
@@ -92,6 +92,64 @@ pub use fusabi_vm::{HostData, Value};
 pub use host_api::{FusabiEngine as Engine, Module};
 // Re-export CompileOptions for advanced compilation control
 pub use fusabi_frontend::CompileOptions;
+
+// ============================================================================
+// Script.eval Implementation
+// ============================================================================
+
+/// Implementation of Script.eval that uses the full compilation pipeline
+/// This overrides the stub implementation in fusabi-vm which doesn't have
+/// access to the compiler.
+fn script_eval_impl(vm: &mut Vm, args: &[fusabi_vm::Value]) -> Result<fusabi_vm::Value, VmError> {
+    if args.is_empty() {
+        return Err(VmError::Runtime("Script.eval requires 1 argument".to_string()));
+    }
+
+    let code = match &args[0] {
+        fusabi_vm::Value::Str(s) => s.clone(),
+        other => return Err(VmError::TypeMismatch {
+            expected: "string",
+            got: other.type_name(),
+        }),
+    };
+
+    // Compile the code using the full compilation pipeline
+    let mut lexer = Lexer::new(&code);
+    let tokens = match lexer.tokenize() {
+        Ok(t) => t,
+        Err(e) => return Err(VmError::Runtime(format!("Lex error: {}", e))),
+    };
+
+    let mut parser = Parser::new(tokens);
+    let program = match parser.parse_program() {
+        Ok(p) => p,
+        Err(e) => return Err(VmError::Runtime(format!("Parse error: {}", e))),
+    };
+
+    let chunk = match Compiler::compile_program(&program) {
+        Ok(c) => c,
+        Err(e) => return Err(VmError::Runtime(format!("Compile error: {}", e))),
+    };
+
+    // Execute in the current VM context
+    vm.execute(chunk)
+}
+
+/// Implementation of Script.evalToString
+/// Evaluates code and returns result as string, or error message with "Error: " prefix
+fn script_eval_to_string_impl(vm: &mut Vm, args: &[fusabi_vm::Value]) -> Result<fusabi_vm::Value, VmError> {
+    match script_eval_impl(vm, args) {
+        Ok(result) => Ok(fusabi_vm::Value::Str(format!("{}", result))),
+        Err(e) => Ok(fusabi_vm::Value::Str(format!("Error: {}", e))),
+    }
+}
+
+/// Register real Script.eval implementations that override the stubs
+/// This should be called after stdlib registration to override the stub versions
+pub(crate) fn register_script_eval_override(vm: &mut Vm) {
+    vm.host_registry.lock().unwrap().register("Script.eval", script_eval_impl);
+    vm.host_registry.lock().unwrap().register("Script.evalToString", script_eval_to_string_impl);
+}
 
 /// Unified error type for the Fusabi pipeline
 #[derive(Debug)]
@@ -253,6 +311,8 @@ pub fn run_source_with_options(source: &str, options: RunOptions) -> Result<Valu
     let mut vm = Vm::new();
     // Register standard library functions and globals
     fusabi_vm::stdlib::register_stdlib(&mut vm);
+    // Override Script.eval with real implementation that has compiler access
+    register_script_eval_override(&mut vm);
 
     let result = vm.execute(chunk)?;
     if options.verbose {
@@ -273,6 +333,8 @@ pub fn run_file(path: &str) -> Result<Value, FusabiError> {
 
         let mut vm = Vm::new();
         fusabi_vm::stdlib::register_stdlib(&mut vm);
+        // Override Script.eval with real implementation that has compiler access
+        register_script_eval_override(&mut vm);
         let result = vm.execute(chunk)?;
         Ok(result)
     } else {
@@ -316,6 +378,8 @@ pub fn run_source_with_disasm(source: &str, name: &str) -> Result<Value, FusabiE
     let mut vm = Vm::new();
     // Register standard library functions and globals
     fusabi_vm::stdlib::register_stdlib(&mut vm);
+    // Override Script.eval with real implementation that has compiler access
+    register_script_eval_override(&mut vm);
 
     let result = vm.execute(chunk)?;
 
@@ -353,6 +417,8 @@ pub fn run_file_with_disasm(path: &str) -> Result<Value, FusabiError> {
     // Stage 4: Execution
     let mut vm = Vm::new();
     fusabi_vm::stdlib::register_stdlib(&mut vm);
+    // Override Script.eval with real implementation that has compiler access
+    register_script_eval_override(&mut vm);
     let result = vm.execute(chunk)?;
 
     Ok(result)
@@ -591,6 +657,8 @@ pub fn execute_bytecode(bytecode: &[u8]) -> Result<Value, FusabiError> {
 
     let mut vm = Vm::new();
     fusabi_vm::stdlib::register_stdlib(&mut vm);
+    // Override Script.eval with real implementation that has compiler access
+    register_script_eval_override(&mut vm);
     let result = vm.execute(chunk)?;
 
     Ok(result)

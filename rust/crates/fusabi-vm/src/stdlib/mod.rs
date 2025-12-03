@@ -3,6 +3,7 @@
 
 pub mod array;
 pub mod config;
+pub mod events;
 pub mod list;
 pub mod map;
 pub mod option;
@@ -399,6 +400,27 @@ pub fn register_stdlib(vm: &mut Vm) {
             registry.register("Osc.client", net::osc::osc_client);
             registry.register("Osc.send", net::osc::osc_send);
         }
+
+        // Events functions
+        registry.register("Events.on", events::events_on);
+        registry.register("Events.off", |_vm, args| {
+            wrap_unary(args, events::events_off)
+        });
+        registry.register("Events.emit", events::events_emit);
+        registry.register("Events.emitAsync", events::events_emit_async);
+        registry.register("Events.once", events::events_once);
+        registry.register("Events.clear", |_vm, args| {
+            wrap_unary(args, events::events_clear)
+        });
+        registry.register("Events.clearAll", |_vm, args| {
+            wrap_unary(args, events::events_clear_all)
+        });
+        registry.register("Events.handlers", |_vm, args| {
+            wrap_unary(args, events::events_handlers)
+        });
+        registry.register("Events.list", |_vm, args| {
+            wrap_unary(args, events::events_list)
+        });
     }
 
     // 2. Populate Globals with Module Records
@@ -631,6 +653,22 @@ pub fn register_stdlib(vm: &mut Vm) {
             Value::Record(Arc::new(Mutex::new(osc_fields))),
         );
     }
+
+    // Events Module
+    let mut events_fields = HashMap::new();
+    events_fields.insert("on".to_string(), native("Events.on", 2));
+    events_fields.insert("off".to_string(), native("Events.off", 1));
+    events_fields.insert("emit".to_string(), native("Events.emit", 2));
+    events_fields.insert("emitAsync".to_string(), native("Events.emitAsync", 2));
+    events_fields.insert("once".to_string(), native("Events.once", 2));
+    events_fields.insert("clear".to_string(), native("Events.clear", 1));
+    events_fields.insert("clearAll".to_string(), native("Events.clearAll", 1));
+    events_fields.insert("handlers".to_string(), native("Events.handlers", 1));
+    events_fields.insert("list".to_string(), native("Events.list", 1));
+    vm.globals.insert(
+        "Events".to_string(),
+        Value::Record(Arc::new(Mutex::new(events_fields))),
+    );
 }
 
 fn wrap_unary<F>(args: &[Value], f: F) -> Result<Value, VmError>

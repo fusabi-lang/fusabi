@@ -12,6 +12,7 @@ pub mod option;
 pub mod math;
 pub mod result;
 pub mod print;
+pub mod script;
 pub mod string;
 pub mod process;
 pub mod terminal_control;
@@ -505,6 +506,10 @@ pub fn register_stdlib(vm: &mut Vm) {
         registry.register("Commands.getById", commands::commands_get_by_id);
         registry.register("Commands.invoke", commands::commands_invoke);
 
+        // Script functions
+        registry.register("Script.eval", script::script_eval);
+        registry.register("Script.evalToString", script::script_eval_to_string);
+
         // Console functions
         registry.register("Console.readLine", |_vm, args| {
             wrap_unary(args, console::console_read_line)
@@ -838,6 +843,15 @@ pub fn register_stdlib(vm: &mut Vm) {
     vm.globals.insert(
         "Console".to_string(),
         Value::Record(Arc::new(Mutex::new(console_fields))),
+    );
+
+    // Script Module
+    let mut script_fields = HashMap::new();
+    script_fields.insert("eval".to_string(), native("Script.eval", 1));
+    script_fields.insert("evalToString".to_string(), native("Script.evalToString", 1));
+    vm.globals.insert(
+        "Script".to_string(),
+        Value::Record(Arc::new(Mutex::new(script_fields))),
     );
 }
 

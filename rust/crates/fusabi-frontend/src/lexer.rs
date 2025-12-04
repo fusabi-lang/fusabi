@@ -4,7 +4,8 @@
 //! a stream of tokens. The lexer supports:
 //!
 //! - Literals: integers, floats, booleans, strings
-//! - Keywords: let, rec, and, in, if, then, else, fun, true, false
+//! - Keywords: let, rec, and, in, if, then, else, fun, true, false, async, return, yield
+//! - Computation expression keywords: let!, do!, return!, yield!
 //! - Identifiers: alphanumeric names starting with letter or underscore
 //! - Operators: arithmetic, comparison, logical, cons (::)
 //! - Punctuation: parentheses, arrows, commas, brackets, semicolons
@@ -81,6 +82,20 @@ pub enum Token {
     Break,
     /// continue keyword (for continuing to next iteration)
     Continue,
+    /// async keyword (for async computation expressions)
+    Async,
+    /// return keyword (for returning from functions)
+    Return,
+    /// yield keyword (for generator functions)
+    Yield,
+    /// let! keyword (for computation expression binding)
+    LetBang,
+    /// do! keyword (for computation expression side-effect)
+    DoBang,
+    /// return! keyword (for computation expression return)
+    ReturnBang,
+    /// yield! keyword (for computation expression yield)
+    YieldBang,
 
     // Operators
     /// + operator
@@ -219,6 +234,13 @@ impl fmt::Display for Token {
             Token::While => write!(f, "while"),
             Token::Break => write!(f, "break"),
             Token::Continue => write!(f, "continue"),
+            Token::Async => write!(f, "async"),
+            Token::Return => write!(f, "return"),
+            Token::Yield => write!(f, "yield"),
+            Token::LetBang => write!(f, "let!"),
+            Token::DoBang => write!(f, "do!"),
+            Token::ReturnBang => write!(f, "return!"),
+            Token::YieldBang => write!(f, "yield!"),
             Token::Eof => write!(f, "EOF"),
         }
     }
@@ -487,6 +509,22 @@ impl Lexer {
 
         let s: String = self.input[start..self.pos].iter().collect();
 
+        // Check for bang-suffix tokens (let!, do!, return!, yield!)
+        if !self.is_at_end() && self.current_char() == '!' {
+            self.advance(); // consume the '!'
+            let token = match s.as_str() {
+                "let" => Token::LetBang,
+                "do" => Token::DoBang,
+                "return" => Token::ReturnBang,
+                "yield" => Token::YieldBang,
+                _ => {
+                    // Not a recognized bang keyword, treat as identifier with bang
+                    Token::Ident(format!("{}!", s))
+                }
+            };
+            return Ok(token);
+        }
+
         let token = match s.as_str() {
             "let" => Token::Let,
             "in" => Token::In,
@@ -506,6 +544,9 @@ impl Lexer {
             "while" => Token::While,
             "break" => Token::Break,
             "continue" => Token::Continue,
+            "async" => Token::Async,
+            "return" => Token::Return,
+            "yield" => Token::Yield,
             "true" => Token::Bool(true),
             "false" => Token::Bool(false),
             _ => Token::Ident(s),
@@ -992,5 +1033,126 @@ mod tests {
         assert_eq!(tokens[0].token, Token::Ident("a".to_string()));
         assert_eq!(tokens[1].token, Token::PlusPlus);
         assert_eq!(tokens[2].token, Token::Ident("b".to_string()));
+    }
+
+    #[test]
+    fn test_lex_async_keyword() {
+        let mut lexer = Lexer::new("async");
+        let tokens = lexer.tokenize().unwrap();
+        assert_eq!(tokens.len(), 2);
+        assert_eq!(tokens[0].token, Token::Async);
+    }
+
+    #[test]
+    fn test_lex_return_keyword() {
+        let mut lexer = Lexer::new("return");
+        let tokens = lexer.tokenize().unwrap();
+        assert_eq!(tokens.len(), 2);
+        assert_eq!(tokens[0].token, Token::Return);
+    }
+
+    #[test]
+    fn test_lex_yield_keyword() {
+        let mut lexer = Lexer::new("yield");
+        let tokens = lexer.tokenize().unwrap();
+        assert_eq!(tokens.len(), 2);
+        assert_eq!(tokens[0].token, Token::Yield);
+    }
+
+    #[test]
+    fn test_lex_let_bang() {
+        let mut lexer = Lexer::new("let!");
+        let tokens = lexer.tokenize().unwrap();
+        assert_eq!(tokens.len(), 2);
+        assert_eq!(tokens[0].token, Token::LetBang);
+    }
+
+    #[test]
+    fn test_lex_do_bang() {
+        let mut lexer = Lexer::new("do!");
+        let tokens = lexer.tokenize().unwrap();
+        assert_eq!(tokens.len(), 2);
+        assert_eq!(tokens[0].token, Token::DoBang);
+    }
+
+    #[test]
+    fn test_lex_return_bang() {
+        let mut lexer = Lexer::new("return!");
+        let tokens = lexer.tokenize().unwrap();
+        assert_eq!(tokens.len(), 2);
+        assert_eq!(tokens[0].token, Token::ReturnBang);
+    }
+
+    #[test]
+    fn test_lex_yield_bang() {
+        let mut lexer = Lexer::new("yield!");
+        let tokens = lexer.tokenize().unwrap();
+        assert_eq!(tokens.len(), 2);
+        assert_eq!(tokens[0].token, Token::YieldBang);
+    }
+
+    #[test]
+    fn test_lex_let_vs_let_bang() {
+        let mut lexer = Lexer::new("let x = let! y = 42");
+        let tokens = lexer.tokenize().unwrap();
+        assert_eq!(tokens[0].token, Token::Let);
+        assert_eq!(tokens[1].token, Token::Ident("x".to_string()));
+        assert_eq!(tokens[2].token, Token::Eq);
+        assert_eq!(tokens[3].token, Token::LetBang);
+        assert_eq!(tokens[4].token, Token::Ident("y".to_string()));
+        assert_eq!(tokens[5].token, Token::Eq);
+        assert_eq!(tokens[6].token, Token::Int(42));
+    }
+
+    #[test]
+    fn test_lex_do_vs_do_bang() {
+        let mut lexer = Lexer::new("do x do! y");
+        let tokens = lexer.tokenize().unwrap();
+        assert_eq!(tokens[0].token, Token::Do);
+        assert_eq!(tokens[1].token, Token::Ident("x".to_string()));
+        assert_eq!(tokens[2].token, Token::DoBang);
+        assert_eq!(tokens[3].token, Token::Ident("y".to_string()));
+    }
+
+    #[test]
+    fn test_lex_computation_expression() {
+        let source = "async { let! x = getAsync() do! printAsync x return! computeAsync x }";
+        let mut lexer = Lexer::new(source);
+        let tokens = lexer.tokenize().unwrap();
+        let async_pos = tokens.iter().position(|t| t.token == Token::Async).unwrap();
+        let letbang_pos = tokens
+            .iter()
+            .position(|t| t.token == Token::LetBang)
+            .unwrap();
+        let dobang_pos = tokens
+            .iter()
+            .position(|t| t.token == Token::DoBang)
+            .unwrap();
+        let returnbang_pos = tokens
+            .iter()
+            .position(|t| t.token == Token::ReturnBang)
+            .unwrap();
+        assert!(async_pos < letbang_pos);
+        assert!(letbang_pos < dobang_pos);
+        assert!(dobang_pos < returnbang_pos);
+    }
+
+    #[test]
+    fn test_lex_bang_on_non_keyword() {
+        let mut lexer = Lexer::new("foo!");
+        let tokens = lexer.tokenize().unwrap();
+        assert_eq!(tokens.len(), 2);
+        assert_eq!(tokens[0].token, Token::Ident("foo!".to_string()));
+    }
+
+    #[test]
+    fn test_lex_yield_in_expression() {
+        let mut lexer = Lexer::new("yield x + yield! y");
+        let tokens = lexer.tokenize().unwrap();
+        assert_eq!(tokens[0].token, Token::Yield);
+        assert_eq!(tokens[1].token, Token::Ident("x".to_string()));
+        assert_eq!(tokens[2].token, Token::Plus);
+        assert_eq!(tokens[3].token, Token::YieldBang);
+        assert_eq!(tokens[4].token, Token::Ident("y".to_string()));
     }
 }

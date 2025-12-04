@@ -3,6 +3,7 @@
 pub mod chunk;
 pub mod closure;
 pub mod conversions;
+pub mod error_reporter;
 pub mod gc;
 pub mod host;
 pub mod instruction;
@@ -10,8 +11,9 @@ pub mod stdlib;
 pub mod value;
 pub mod vm;
 
-pub use chunk::{Chunk, ChunkBuilder};
+pub use chunk::{Chunk, ChunkBuilder, SourceSpan};
 pub use closure::{Closure, Upvalue};
+pub use error_reporter::{format_error, RuntimeError};
 pub use gc::{GcHeap, GcStats, Trace, Tracer};
 pub use host::{HostFn, HostRegistry};
 pub use instruction::Instruction;

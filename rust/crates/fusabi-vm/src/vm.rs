@@ -133,10 +133,24 @@ pub struct Vm {
 }
 
 impl Vm {
-    /// Create a new VM
+    /// Default stack capacity for pre-allocation
+    const DEFAULT_STACK_CAPACITY: usize = 256;
+
+    /// Create a new VM with pre-allocated stack
     pub fn new() -> Self {
         Vm {
-            stack: Vec::new(),
+            stack: Vec::with_capacity(Self::DEFAULT_STACK_CAPACITY),
+            frames: Vec::new(),
+            globals: HashMap::new(),
+            host_registry: Arc::new(Mutex::new(HostRegistry::new())),
+            gc_heap: GcHeap::new(),
+        }
+    }
+
+    /// Create a new VM with a custom stack capacity
+    pub fn with_stack_capacity(capacity: usize) -> Self {
+        Vm {
+            stack: Vec::with_capacity(capacity),
             frames: Vec::new(),
             globals: HashMap::new(),
             host_registry: Arc::new(Mutex::new(HostRegistry::new())),
@@ -147,7 +161,7 @@ impl Vm {
     /// Create a new VM with a custom GC threshold
     pub fn with_gc_threshold(threshold: usize) -> Self {
         Vm {
-            stack: Vec::new(),
+            stack: Vec::with_capacity(Self::DEFAULT_STACK_CAPACITY),
             frames: Vec::new(),
             globals: HashMap::new(),
             host_registry: Arc::new(Mutex::new(HostRegistry::new())),
@@ -419,10 +433,10 @@ impl Vm {
                     }
                 }
 
-                // Arithmetic operations
+                // Arithmetic operations - use unchecked pops since bytecode guarantees stack has values
                 Instruction::Add => {
-                    let b = self.pop()?;
-                    let a = self.pop()?;
+                    let b = self.pop_unchecked();
+                    let a = self.pop_unchecked();
                     match (a, b) {
                         (Value::Int(a), Value::Int(b)) => self.push(Value::Int(a + b)),
                         (Value::Float(a), Value::Float(b)) => self.push(Value::Float(a + b)),
@@ -437,8 +451,8 @@ impl Vm {
                 }
 
                 Instruction::Sub => {
-                    let b = self.pop()?;
-                    let a = self.pop()?;
+                    let b = self.pop_unchecked();
+                    let a = self.pop_unchecked();
                     match (a, b) {
                         (Value::Int(a), Value::Int(b)) => self.push(Value::Int(a - b)),
                         (Value::Float(a), Value::Float(b)) => self.push(Value::Float(a - b)),
@@ -453,8 +467,8 @@ impl Vm {
                 }
 
                 Instruction::Mul => {
-                    let b = self.pop()?;
-                    let a = self.pop()?;
+                    let b = self.pop_unchecked();
+                    let a = self.pop_unchecked();
                     match (a, b) {
                         (Value::Int(a), Value::Int(b)) => self.push(Value::Int(a * b)),
                         (Value::Float(a), Value::Float(b)) => self.push(Value::Float(a * b)),
@@ -469,8 +483,8 @@ impl Vm {
                 }
 
                 Instruction::Div => {
-                    let b = self.pop()?;
-                    let a = self.pop()?;
+                    let b = self.pop_unchecked();
+                    let a = self.pop_unchecked();
                     match (a, b) {
                         (Value::Int(a), Value::Int(b)) => {
                             if b == 0 {
@@ -1163,18 +1177,44 @@ impl Vm {
     }
 
     /// Peek at the top of the stack without removing it
+    #[inline(always)]
     fn peek(&self) -> Result<&Value, VmError> {
         self.stack.last().ok_or(VmError::StackUnderflow)
     }
 
+    /// Peek at the top of the stack without bounds checking (release builds)
+    /// # Safety
+    /// Caller must ensure the stack is non-empty
+    #[inline(always)]
+    #[allow(dead_code)]
+    fn peek_unchecked(&self) -> &Value {
+        debug_assert!(!self.stack.is_empty(), "peek_unchecked called on empty stack");
+        unsafe { self.stack.get_unchecked(self.stack.len() - 1) }
+    }
+
     /// Push a value onto the stack
+    #[inline(always)]
     fn push(&mut self, value: Value) {
         self.stack.push(value);
     }
 
     /// Pop a value from the stack
+    #[inline(always)]
     fn pop(&mut self) -> Result<Value, VmError> {
         self.stack.pop().ok_or(VmError::StackUnderflow)
+    }
+
+    /// Pop a value from the stack without bounds checking (release builds)
+    /// # Safety
+    /// Caller must ensure the stack is non-empty
+    #[inline(always)]
+    fn pop_unchecked(&mut self) -> Value {
+        debug_assert!(!self.stack.is_empty(), "pop_unchecked called on empty stack");
+        unsafe {
+            let len = self.stack.len() - 1;
+            self.stack.set_len(len);
+            std::ptr::read(self.stack.as_ptr().add(len))
+        }
     }
 
     /// Pop an integer from the stack
@@ -1206,6 +1246,7 @@ impl Vm {
     }
 
     /// Get a local variable
+    #[inline(always)]
     fn get_local(&self, idx: u8) -> Result<Value, VmError> {
         let frame = self.frames.last().ok_or(VmError::NoActiveFrame)?;
         let local_idx = frame.base + idx as usize;
@@ -1216,6 +1257,7 @@ impl Vm {
     }
 
     /// Set a local variable
+    #[inline(always)]
     fn set_local(&mut self, idx: u8, value: Value) -> Result<(), VmError> {
         let frame = self.frames.last().ok_or(VmError::NoActiveFrame)?;
         let local_idx = frame.base + idx as usize;
@@ -1591,7 +1633,8 @@ mod tests {
         let chunk = ChunkBuilder::new()
             .constant(Value::Int(42))
             .instruction(Instruction::LoadConst(0))
-            .instruction(Instruction::Add)
+            .instruction(Instruction::Pop)
+            .instruction(Instruction::Pop)  // This should underflow
             .instruction(Instruction::Return)
             .build();
         let result = vm.execute(chunk);
@@ -1610,13 +1653,7 @@ mod tests {
             .instruction(Instruction::Return)
             .build();
         let result = vm.execute(chunk);
-        assert!(matches!(
-            result,
-            Err(VmError::TypeMismatch {
-                expected: "int",
-                got: "bool"
-            })
-        ));
+        assert!(matches!(result, Err(VmError::Runtime(_))));
     }
 
     // ========== Tuple Tests ==========

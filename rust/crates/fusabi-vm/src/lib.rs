@@ -7,6 +7,8 @@ pub mod error_reporter;
 pub mod gc;
 pub mod host;
 pub mod instruction;
+pub mod optimized_vm;
+pub mod optimizer;
 pub mod stdlib;
 pub mod value;
 pub mod vm;
@@ -17,6 +19,7 @@ pub use error_reporter::{format_error, RuntimeError};
 pub use gc::{GcHeap, GcStats, Trace, Tracer};
 pub use host::{HostFn, HostRegistry};
 pub use instruction::Instruction;
+pub use optimized_vm::FastVm;
 pub use value::{HostData, Value};
 pub use vm::{Frame, Vm, VmError};
 

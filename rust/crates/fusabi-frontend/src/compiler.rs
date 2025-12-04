@@ -323,6 +323,22 @@ impl Compiler {
             Expr::While { cond, body } => {
                 Self::expr_references_var(cond, name) || Self::expr_references_var(body, name)
             }
+            Expr::ComputationExpr { body, .. } => {
+                // Check if any statement in the CE body references the variable
+                body.iter().any(|stmt| {
+                    use crate::ast::CEStatement;
+                    match stmt {
+                        CEStatement::Let { value, .. }
+                        | CEStatement::LetBang { value, .. }
+                        | CEStatement::DoBang { value }
+                        | CEStatement::Return { value }
+                        | CEStatement::ReturnBang { value }
+                        | CEStatement::Yield { value }
+                        | CEStatement::YieldBang { value }
+                        | CEStatement::Expr { value } => Self::expr_references_var(value, name),
+                    }
+                })
+            }
             // Literals and control flow don't reference variables
             Expr::Lit(_) | Expr::Break | Expr::Continue => false,
         }
@@ -544,6 +560,9 @@ impl Compiler {
             Expr::While { cond, body } => self.compile_while(cond, body),
             Expr::Break => self.compile_break(),
             Expr::Continue => self.compile_continue(),
+            Expr::ComputationExpr { builder, body } => {
+                self.compile_computation_expr(builder, body)
+            }
         }
     }
 
@@ -1180,6 +1199,19 @@ impl Compiler {
             .push(jump_idx);
 
         Ok(())
+    }
+
+    /// Compile a computation expression (stub implementation)
+    fn compile_computation_expr(
+        &mut self,
+        _builder: &str,
+        _body: &[crate::ast::CEStatement],
+    ) -> CompileResult<()> {
+        // TODO: Implement computation expression compilation
+        // This is a stub to allow the AST to compile
+        Err(CompileError::CodeGenError(
+            "Computation expressions are not yet implemented".to_string(),
+        ))
     }
 
     /// Compile a match expression with full pattern matching support

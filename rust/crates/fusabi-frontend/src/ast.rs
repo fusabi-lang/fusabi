@@ -522,6 +522,43 @@ impl MatchArm {
     }
 }
 
+
+/// Statement within a computation expression
+#[derive(Debug, Clone, PartialEq)]
+pub enum CEStatement {
+    /// let x = expr (regular binding)
+    Let { name: String, value: Box<Expr> },
+    /// let! x = expr (bind/await)
+    LetBang { name: String, value: Box<Expr> },
+    /// do! expr (bind with unit result)
+    DoBang { value: Box<Expr> },
+    /// return expr
+    Return { value: Box<Expr> },
+    /// return! expr
+    ReturnBang { value: Box<Expr> },
+    /// yield expr (for sequence builders)
+    Yield { value: Box<Expr> },
+    /// yield! expr
+    YieldBang { value: Box<Expr> },
+    /// Plain expression (last expression or side effects)
+    Expr { value: Box<Expr> },
+}
+
+impl fmt::Display for CEStatement {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            CEStatement::Let { name, value } => write!(f, "let {} = {}", name, value),
+            CEStatement::LetBang { name, value } => write!(f, "let! {} = {}", name, value),
+            CEStatement::DoBang { value } => write!(f, "do! {}", value),
+            CEStatement::Return { value } => write!(f, "return {}", value),
+            CEStatement::ReturnBang { value } => write!(f, "return! {}", value),
+            CEStatement::Yield { value } => write!(f, "yield {}", value),
+            CEStatement::YieldBang { value } => write!(f, "yield! {}", value),
+            CEStatement::Expr { value } => write!(f, "{}", value),
+        }
+    }
+}
+
 /// Core expression types in the AST.
 ///
 /// Represents all expression forms supported in Phase 1 of Fusabi.
@@ -653,6 +690,14 @@ pub enum Expr {
 
     /// Continue statement (skips to next iteration)
     Continue,
+
+    /// Computation expression: async { ... }, seq { ... }, etc.
+    ComputationExpr {
+        /// Builder name (e.g., "async", "seq", "option", "result")
+        builder: String,
+        /// Statements in the CE body
+        body: Vec<CEStatement>,
+    },
 }
 
 /// Type alias for record field list: (field_name, value_expression)
@@ -784,6 +829,12 @@ impl Expr {
         matches!(self, Expr::Continue)
     }
 
+
+    /// Returns true if this expression is a computation expression.
+    pub fn is_computation_expr(&self) -> bool {
+        matches!(self, Expr::ComputationExpr { .. })
+    }
+
     /// Returns the variable name if this is a Var, otherwise None.
     pub fn as_var(&self) -> Option<&str> {
         match self {
@@ -844,6 +895,14 @@ impl Expr {
     pub fn as_match(&self) -> Option<(&Expr, &Vec<MatchArm>)> {
         match self {
             Expr::Match { scrutinee, arms } => Some((scrutinee, arms)),
+            _ => None,
+        }
+    }
+
+    /// Returns the builder name and body if this is a ComputationExpr, otherwise None.
+    pub fn as_computation_expr(&self) -> Option<(&str, &Vec<CEStatement>)> {
+        match self {
+            Expr::ComputationExpr { builder, body } => Some((builder, body)),
             _ => None,
         }
     }
@@ -1006,6 +1065,9 @@ impl fmt::Display for Expr {
             }
             Expr::Break => write!(f, "break"),
             Expr::Continue => write!(f, "continue"),
+            Expr::ComputationExpr { builder, body } => {
+                write!(f, "{} {{ ... ({} statements) }}", builder, body.len())
+            }
         }
     }
 }

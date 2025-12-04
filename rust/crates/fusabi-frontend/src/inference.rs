@@ -193,6 +193,22 @@ impl TypeInference {
             Expr::While { cond, body } => {
                 Self::expr_references_var(cond, name) || Self::expr_references_var(body, name)
             }
+            Expr::ComputationExpr { body, .. } => {
+                // Check if any statement in the CE body references the variable
+                body.iter().any(|stmt| {
+                    use crate::ast::CEStatement;
+                    match stmt {
+                        CEStatement::Let { value, .. }
+                        | CEStatement::LetBang { value, .. }
+                        | CEStatement::DoBang { value }
+                        | CEStatement::Return { value }
+                        | CEStatement::ReturnBang { value }
+                        | CEStatement::Yield { value }
+                        | CEStatement::YieldBang { value }
+                        | CEStatement::Expr { value } => Self::expr_references_var(value, name),
+                    }
+                })
+            }
             // Literals and control flow don't reference variables
             Expr::Lit(_) | Expr::Break | Expr::Continue => false,
         }
@@ -337,6 +353,13 @@ impl TypeInference {
                 // Continue has unit type but can only appear in loops
                 // We'll let the compiler handle loop context validation
                 Ok(Type::Unit)
+            }
+
+            // Computation expression (stub implementation)
+            Expr::ComputationExpr { builder: _, body: _ } => {
+                // TODO: Implement proper type inference for computation expressions
+                // For now, return a fresh type variable
+                Ok(Type::Var(self.fresh_var()))
             }
         }
     }

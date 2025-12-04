@@ -7,6 +7,48 @@ use crate::value::Value;
 use serde::{Deserialize, Serialize};
 use std::fmt;
 
+/// Source location information for error reporting
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+pub struct SourceSpan {
+    /// Line number (1-indexed)
+    pub line: u32,
+    /// Column number (1-indexed)
+    pub column: u32,
+    /// Byte offset in source (0-indexed)
+    pub offset: u32,
+    /// Length in bytes
+    pub length: u32,
+}
+
+impl SourceSpan {
+    /// Create a new source span
+    pub fn new(line: u32, column: u32, offset: u32, length: u32) -> Self {
+        SourceSpan {
+            line,
+            column,
+            offset,
+            length,
+        }
+    }
+
+    /// Create an empty/unknown span
+    pub fn unknown() -> Self {
+        SourceSpan::default()
+    }
+
+    /// Check if this span has valid location info
+    pub fn is_known(&self) -> bool {
+        self.line > 0
+    }
+}
+
+impl fmt::Display for SourceSpan {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}:{}", self.line, self.column)
+    }
+}
+
 /// A chunk of bytecode representing a compiled function
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
@@ -14,6 +56,15 @@ pub struct Chunk {
     pub instructions: Vec<Instruction>,
     pub constants: Vec<Value>,
     pub name: Option<String>,
+    /// Source spans for each instruction (debug info)
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub spans: Vec<SourceSpan>,
+    /// Original source code (optional, for error display)
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub source: Option<String>,
+    /// Source file name
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub source_file: Option<String>,
 }
 
 impl Chunk {
@@ -22,6 +73,9 @@ impl Chunk {
             instructions: Vec::new(),
             constants: Vec::new(),
             name: None,
+            spans: Vec::new(),
+            source: None,
+            source_file: None,
         }
     }
 
@@ -30,7 +84,25 @@ impl Chunk {
             instructions: Vec::new(),
             constants: Vec::new(),
             name: Some(name.into()),
+            spans: Vec::new(),
+            source: None,
+            source_file: None,
         }
+    }
+
+    /// Set the source code for this chunk (for error reporting)
+    pub fn set_source(&mut self, source: impl Into<String>) {
+        self.source = Some(source.into());
+    }
+
+    /// Set the source file name for this chunk
+    pub fn set_source_file(&mut self, file: impl Into<String>) {
+        self.source_file = Some(file.into());
+    }
+
+    /// Get the span for an instruction at the given offset
+    pub fn span_at(&self, offset: usize) -> Option<SourceSpan> {
+        self.spans.get(offset).copied().filter(|s| s.is_known())
     }
 
     pub fn add_constant(&mut self, value: Value) -> u16 {
@@ -40,10 +112,19 @@ impl Chunk {
 
     pub fn emit(&mut self, instruction: Instruction) {
         self.instructions.push(instruction);
+        self.spans.push(SourceSpan::unknown());
+    }
+
+    /// Emit an instruction with source span information
+    pub fn emit_with_span(&mut self, instruction: Instruction, span: SourceSpan) {
+        self.instructions.push(instruction);
+        self.spans.push(span);
     }
 
     pub fn emit_all(&mut self, instructions: impl IntoIterator<Item = Instruction>) {
-        self.instructions.extend(instructions);
+        for instr in instructions {
+            self.emit(instr);
+        }
     }
 
     pub fn current_offset(&self) -> usize {

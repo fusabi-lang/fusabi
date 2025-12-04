@@ -168,6 +168,12 @@ impl Default for Chunk {
     }
 }
 
+impl Chunk {
+    pub fn optimize(&mut self) {
+        crate::optimizer::optimize_chunk(self);
+    }
+}
+
 impl fmt::Display for Chunk {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let name = self.name.as_deref().unwrap_or("<unnamed>");

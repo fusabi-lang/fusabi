@@ -798,11 +798,6 @@ impl Vm {
                         .ok_or(VmError::StackUnderflow)?;
                     let receiver = &self.stack[receiver_idx];
 
-                    // DEBUG: Inspect receiver for CallMethod bug
-                    eprintln!("DEBUG: CallMethod method_name='{}', argc={}", method_name, argc);
-                    eprintln!("DEBUG: CallMethod receiver_idx={}", receiver_idx);
-                    eprintln!("DEBUG: CallMethod receiver={:?} (type: {})", receiver, receiver.type_name());
-
                     // Check receiver type and dispatch accordingly
                     match receiver {
                         Value::HostData(host_data) => {
@@ -922,14 +917,16 @@ impl Vm {
                 }
 
                 Instruction::Return => {
+                    let returned_value = self.pop().unwrap_or(Value::Unit);
+
                     // Pop the frame
                     self.frames.pop();
 
                     // If we've dropped below the starting depth, we're done with this run() call
                     if self.frames.len() < start_depth {
-                        // Return the top of stack or Unit if empty
-                        return Ok(self.stack.pop().unwrap_or(Value::Unit));
+                        return Ok(returned_value);
                     }
+                    self.push(returned_value); // Push back if not final return
                 }
 
                 // List operations

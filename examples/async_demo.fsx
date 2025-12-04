@@ -1,6 +1,6 @@
-// Async Demo Debug 7: Bypass Sprintf
 let log msg =
-    printfn msg
+    let t = Time.format "%H:%M:%S" (Time.now())
+    printfn (sprintf "[%s] %s" [t; msg])
 
 let sleep ms = async {
     log (sprintf "Sleeping for %d ms..." [ms])

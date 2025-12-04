@@ -58,15 +58,6 @@ pub fn async_delay(_vm: &mut Vm, args: &[Value]) -> Result<Value, VmError> {
     })
 }
 
-    let generator = args[0].clone();
-
-    Ok(Value::Variant {
-        type_name: "Async".to_string(),
-        variant_name: "Delay".to_string(),
-        fields: vec![generator],
-    })
-}
-
 /// Async.ReturnFrom : Async<'a> -> Async<'a>
 pub fn async_return_from(_vm: &mut Vm, args: &[Value]) -> Result<Value, VmError> {
     if args.len() != 1 {

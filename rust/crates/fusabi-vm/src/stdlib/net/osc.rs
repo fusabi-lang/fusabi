@@ -1,8 +1,7 @@
 // Fusabi Net Module
 // Provides networking capabilities including OSC and HTTP
 
-#[cfg(feature = "osc")]
-pub mod osc;
+
 // OSC (Open Sound Control) client implementation for Fusabi
 // Enables communication with OSC-compatible applications like Ardour
 

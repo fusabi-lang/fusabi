@@ -27,6 +27,22 @@ Think of it as the wasabi to your Rust sushi: **small kick, big impact**. 🍣
 
 **Safe host interop.** Re-entrant API designed for production Rust. Call Rust from F#, call F# from Rust. No unsafe blocks required. 🦀
 
+## Ecosystem & Tools
+
+Fusabi's core is lean, but the ecosystem provides powerful tools for production applications:
+
+### [fusabi-host](https://github.com/fusabi-lang/fusabi-host)
+**Shared Host Runtime & Utilities**
+Provides a stable, high-level API for embedding Fusabi. Features `EnginePool` for concurrent execution, `Sandbox` configuration for resource limits (CPU, memory, time), and typed host function macros. Resolves issues #231, #232, #234, #235.
+
+### [fusabi-plugin-runtime](https://github.com/fusabi-lang/fusabi-plugin-runtime)
+**Plugin System & Hot-Reload**
+A complete runtime for loading untrusted plugins. Supports manifest validation (`plugin.toml`), capability-based security, and automatic hot-reloading of scripts. Ideal for game mods, observability pipelines, and extensible apps. Addresses issue #235.
+
+### [fusabi-stdlib-ext](https://github.com/fusabi-lang/fusabi-stdlib-ext)
+**Extended Standard Library**
+Optional, modular standard library expansions. Includes modules for `Process` execution, `Fs` operations, `Net` (HTTP), `Time`, and `Metrics`, all guarded by configurable allowlists and timeouts. Addresses issue #233.
+
 ## Quick Taste
 
 ```bash

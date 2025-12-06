@@ -127,6 +127,17 @@ jobs:
       - name: Setup Rust toolchain
         uses: dtolnay/rust-toolchain@stable
 
+      - name: Verify MSRV in Cargo.toml
+        run: |
+          echo "Checking MSRV is set in all Cargo.toml files..."
+          for toml in rust/crates/*/Cargo.toml; do
+            if ! grep -q "rust-version" "$toml"; then
+              echo "::error::Missing rust-version in $toml"
+              exit 1
+            fi
+          done
+          echo "MSRV check passed!"
+
       - name: Publish fusabi-vm
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_TOKEN }}
@@ -153,3 +164,35 @@ jobs:
         run: |
           cd rust
           cargo publish -p fusabi
+
+  # Publish documentation
+  publish-docs:
+    name: Publish Documentation
+    needs: [create-release]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Build API documentation
+        run: |
+          cd rust
+          cargo doc --workspace --no-deps
+
+      - name: Create docs archive
+        run: |
+          cd rust/target
+          tar -czf ../../fusabi-docs-${{ needs.create-release.outputs.version }}.tar.gz doc/
+
+      - name: Upload docs to release
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.create-release.outputs.upload_url }}
+          asset_path: fusabi-docs-${{ needs.create-release.outputs.version }}.tar.gz
+          asset_name: fusabi-docs-${{ needs.create-release.outputs.version }}.tar.gz
+          asset_content_type: application/gzip

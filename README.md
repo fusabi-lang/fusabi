@@ -286,22 +286,28 @@ fn main() {
 - Production-ready caching patterns
 - No compilation overhead in hot paths
 
-See the [Embedding Guide](docs/embedding-guide.md) for production patterns and performance optimization.
+See the [Embedding Guide](docs/design/embedding-guide.md) for production patterns and performance optimization.
 
 ## Learn More
 
 ### Core Documentation
 - **[Language Spec](docs/02-language-spec.md)** - What F# features are supported? (Spoiler: most of them)
-- **[Bytecode Format](docs/bytecode-format.md)** - The `.fzb` binary format specification
-- **[Embedding Guide](docs/embedding-guide.md)** - Production deployment with bytecode compilation
-- **[Host Interop](docs/host-interop.md)** - Embedding Fusabi in your Rust app
-- **[Standard Library API](docs/stdlib/)** - Complete API reference for List, String, Option, and Map modules
+- **[Bytecode Format](docs/design/bytecode-format.md)** - The `.fzb` binary format specification
+- **[Embedding Guide](docs/design/embedding-guide.md)** - Production deployment with bytecode compilation
+- **[Host Interop](docs/design/host-interop.md)** - Embedding Fusabi in your Rust app
+- **[Standard Library API](docs/STDLIB_REFERENCE.md)** - Complete API reference for List, String, Option, and Map modules
 
 ### Project Info
-- **[Roadmap](docs/roadmap.md)** - What's next for Fusabi
-- **[Setup Guide](docs/setup.md)** - Get your dev environment running
-- **[Branding Guidelines](docs/BRANDING.md)** - Colors, logos, and brand voice
-- **[Full Docs Index](docs/toc.md)** - Everything else
+- **[Roadmap](docs/meta/roadmap.md)** - What's next for Fusabi
+- **[Setup Guide](docs/meta/setup.md)** - Get your dev environment running
+- **[Branding Guidelines](docs/meta/BRANDING.md)** - Colors, logos, and brand voice
+- **[Documentation Structure](docs/STRUCTURE.md)** - How our docs are organized
+- **[Release Process](docs/RELEASE.md)** - How we ship new versions
+- **[Full Docs Index](docs/meta/toc.md)** - Everything else
+
+### Versioned Documentation
+- **[Latest (vNEXT)](docs/versions/vNEXT/)** - Upcoming release documentation
+- **Version-specific docs** available in `docs/versions/` for each release
 
 ## Use Cases
 

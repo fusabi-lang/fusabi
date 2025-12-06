@@ -1,0 +1,23 @@
+# CODEOWNERS - Defines who is responsible for reviewing specific parts of the codebase
+# See: https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+
+# Release-related files require review from maintainers
+/.github/workflows/release.yml @fusabi-lang/maintainers
+/rust/*/Cargo.toml @fusabi-lang/maintainers
+/rust/Cargo.toml @fusabi-lang/maintainers
+/docs/RELEASE.md @fusabi-lang/maintainers
+
+# CI/CD workflow changes require review
+/.github/workflows/ @fusabi-lang/maintainers
+
+# Documentation structure changes
+/docs/STRUCTURE.md @fusabi-lang/maintainers
+/docs/versions/ @fusabi-lang/maintainers
+
+# Core language and VM changes
+/rust/crates/fusabi-vm/ @fusabi-lang/core-team
+/rust/crates/fusabi-frontend/ @fusabi-lang/core-team
+
+# Security-related files
+/docs/design/SECURITY.md @fusabi-lang/security-team
+/.secrets.baseline @fusabi-lang/security-team

@@ -42,6 +42,39 @@ jobs:
       - name: Check compilation
         run: just check-compile
 
+  # MSRV (Minimum Supported Rust Version) check
+  msrv-check:
+    name: MSRV Check
+    needs: check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install just
+        uses: taiki-e/install-action@just
+
+      - name: Setup Rust MSRV toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: "1.70.0"
+
+      - name: Setup Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: rust
+          key: msrv-1.70.0
+
+      - name: Check compilation with MSRV
+        run: |
+          cd rust
+          cargo check --workspace --all-features
+
+      - name: Run tests with MSRV
+        run: |
+          cd rust
+          cargo test --workspace
+
   # Test suite - runs in parallel with different configurations
   test:
     name: Test Suite
@@ -246,6 +279,40 @@ jobs:
             exit 1
           fi
 
+      - name: Check documentation structure
+        run: |
+          # Check required documentation files exist
+          required_files=(
+            "docs/STRUCTURE.md"
+            "docs/RELEASE.md"
+            "docs/01-overview.md"
+            "docs/02-language-spec.md"
+            "docs/03-vm-design.md"
+            "docs/STDLIB_REFERENCE.md"
+          )
+
+          missing_files=()
+          for file in "${required_files[@]}"; do
+            if [ ! -f "$file" ]; then
+              missing_files+=("$file")
+            fi
+          done
+
+          if [ ${#missing_files[@]} -ne 0 ]; then
+            echo "::error::Missing required documentation files:"
+            printf '%s\n' "${missing_files[@]}"
+            exit 1
+          fi
+
+          # Check for forbidden content (AI notes)
+          if find docs -type f -name "*notes*.md" -o -name "*instructions*.md" | grep -q .; then
+            echo "::error::Found AI notes or instructions files in docs/. These should not be committed."
+            find docs -type f -name "*notes*.md" -o -name "*instructions*.md"
+            exit 1
+          fi
+
+          echo "Documentation structure check passed!"
+
   # Benchmark - ensure benchmarks compile (don't run them in CI)
   benchmark-check:
     name: Benchmark Check
@@ -271,7 +338,7 @@ jobs:
   # All checks passed
   ci-success:
     name: CI Success
-    needs: [check, test, build-release, coverage, security-audit, docs, docs-freshness]
+    needs: [check, msrv-check, test, build-release, coverage, security-audit, docs, docs-freshness]
     runs-on: ubuntu-latest
     steps:
       - name: Mark CI as successful

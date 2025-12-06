@@ -6,10 +6,13 @@ use crate::vm::{Vm, VmError};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
+type ConfigEntry = (ConfigSchema, Option<Value>);
+type ConfigRegistryType = Arc<Mutex<HashMap<String, ConfigEntry>>>;
+
 lazy_static::lazy_static! {
     /// Global registry for configuration schemas and values
     /// Key: config name, Value: (schema, current value)
-    static ref CONFIG_REGISTRY: Arc<Mutex<HashMap<String, (ConfigSchema, Option<Value>)>>> =
+    static ref CONFIG_REGISTRY: ConfigRegistryType =
         Arc::new(Mutex::new(HashMap::new()));
 }
 
@@ -36,7 +39,7 @@ impl ConfigSchema {
             .get("name")
             .ok_or_else(|| VmError::Runtime("ConfigSchema missing 'name' field".to_string()))?
             .as_str()
-            .ok_or_else(|| VmError::TypeMismatch {
+            .ok_or(VmError::TypeMismatch {
                 expected: "string",
                 got: "other",
             })?
@@ -46,7 +49,7 @@ impl ConfigSchema {
             .get("configType")
             .ok_or_else(|| VmError::Runtime("ConfigSchema missing 'configType' field".to_string()))?
             .as_str()
-            .ok_or_else(|| VmError::TypeMismatch {
+            .ok_or(VmError::TypeMismatch {
                 expected: "string",
                 got: "other",
             })?
@@ -64,26 +67,26 @@ impl ConfigSchema {
         }
 
         // Extract default value (Option)
-        let default_value = fields
-            .get("default")
-            .and_then(|v| match v {
-                Value::Variant { variant_name, fields, .. } if variant_name == "Some" => {
-                    fields.first().cloned()
-                }
-                Value::Variant { variant_name, .. } if variant_name == "None" => None,
-                _ => None,
-            });
+        let default_value = fields.get("default").and_then(|v| match v {
+            Value::Variant {
+                variant_name,
+                fields,
+                ..
+            } if variant_name == "Some" => fields.first().cloned(),
+            Value::Variant { variant_name, .. } if variant_name == "None" => None,
+            _ => None,
+        });
 
         // Extract validator function (Option)
-        let validator = fields
-            .get("validator")
-            .and_then(|v| match v {
-                Value::Variant { variant_name, fields, .. } if variant_name == "Some" => {
-                    fields.first().cloned()
-                }
-                Value::Variant { variant_name, .. } if variant_name == "None" => None,
-                _ => None,
-            });
+        let validator = fields.get("validator").and_then(|v| match v {
+            Value::Variant {
+                variant_name,
+                fields,
+                ..
+            } if variant_name == "Some" => fields.first().cloned(),
+            Value::Variant { variant_name, .. } if variant_name == "None" => None,
+            _ => None,
+        });
 
         Ok(ConfigSchema {
             name,
@@ -96,12 +99,13 @@ impl ConfigSchema {
     /// Validate that a ConfigValue matches the expected type
     fn validate_type(&self, config_value: &Value) -> Result<(), VmError> {
         // Extract the variant name and fields from ConfigValue
-        let (type_name, variant_name, fields) = config_value.as_variant().ok_or_else(|| {
-            VmError::TypeMismatch {
-                expected: "ConfigValue variant",
-                got: config_value.type_name(),
-            }
-        })?;
+        let (type_name, variant_name, fields) =
+            config_value
+                .as_variant()
+                .ok_or_else(|| VmError::TypeMismatch {
+                    expected: "ConfigValue variant",
+                    got: config_value.type_name(),
+                })?;
 
         if type_name != "ConfigValue" {
             return Err(VmError::Runtime(format!(
@@ -179,7 +183,7 @@ pub fn config_define(vm: &mut Vm, args: &[Value]) -> Result<Value, VmError> {
 
         // Run validator function if provided
         if let Some(ref validator) = schema.validator {
-            let result = vm.call_value(validator.clone(), &[value.clone()])?;
+            let result = vm.call_value(validator.clone(), std::slice::from_ref(value))?;
             match result {
                 Value::Bool(true) => {}
                 Value::Bool(false) => {
@@ -213,9 +217,9 @@ pub fn config_get(name: &Value) -> Result<Value, VmError> {
     })?;
 
     let registry = CONFIG_REGISTRY.lock().unwrap();
-    let (_, value) = registry.get(name_str).ok_or_else(|| {
-        VmError::Runtime(format!("Configuration '{}' not found", name_str))
-    })?;
+    let (_, value) = registry
+        .get(name_str)
+        .ok_or_else(|| VmError::Runtime(format!("Configuration '{}' not found", name_str)))?;
 
     value.clone().ok_or_else(|| {
         VmError::Runtime(format!(
@@ -269,7 +273,7 @@ pub fn config_set(vm: &mut Vm, args: &[Value]) -> Result<Value, VmError> {
 
     // Run validator function if provided
     if let Some(ref validator) = schema.validator {
-        let result = vm.call_value(validator.clone(), &[value.clone()])?;
+        let result = vm.call_value(validator.clone(), std::slice::from_ref(value))?;
         match result {
             Value::Bool(true) => {}
             Value::Bool(false) => {
@@ -355,7 +359,10 @@ mod tests {
     ) -> Value {
         let mut fields = HashMap::new();
         fields.insert("name".to_string(), Value::Str(name.to_string()));
-        fields.insert("configType".to_string(), Value::Str(config_type.to_string()));
+        fields.insert(
+            "configType".to_string(),
+            Value::Str(config_type.to_string()),
+        );
 
         let default_option = match default {
             Some(val) => Value::Variant {
@@ -453,21 +460,13 @@ mod tests {
         clear_registry();
         let mut vm = Vm::new();
 
-        let schema = create_config_schema(
-            "port",
-            "int",
-            Some(create_config_value_int(8080)),
-            None,
-        );
+        let schema = create_config_schema("port", "int", Some(create_config_value_int(8080)), None);
         config_define(&mut vm, &[schema]).unwrap();
 
         let result = config_get(&Value::Str("port".to_string()));
         assert!(result.is_ok());
         let value = result.unwrap();
-        assert_eq!(
-            value.variant_name().unwrap(),
-            "Int"
-        );
+        assert_eq!(value.variant_name().unwrap(), "Int");
     }
 
     #[test]
@@ -553,18 +552,8 @@ mod tests {
         clear_registry();
         let mut vm = Vm::new();
 
-        let schema1 = create_config_schema(
-            "a",
-            "int",
-            Some(create_config_value_int(1)),
-            None,
-        );
-        let schema2 = create_config_schema(
-            "b",
-            "int",
-            Some(create_config_value_int(2)),
-            None,
-        );
+        let schema1 = create_config_schema("a", "int", Some(create_config_value_int(1)), None);
+        let schema2 = create_config_schema("b", "int", Some(create_config_value_int(2)), None);
         config_define(&mut vm, &[schema1]).unwrap();
         config_define(&mut vm, &[schema2]).unwrap();
 
@@ -580,21 +569,13 @@ mod tests {
         let mut vm = Vm::new();
         crate::stdlib::register_stdlib(&mut vm);
 
-        let schema = create_config_schema(
-            "test",
-            "int",
-            Some(create_config_value_int(100)),
-            None,
-        );
+        let schema = create_config_schema("test", "int", Some(create_config_value_int(100)), None);
         config_define(&mut vm, &[schema]).unwrap();
 
         // Set a new value
         config_set(
             &mut vm,
-            &[
-                Value::Str("test".to_string()),
-                create_config_value_int(200),
-            ],
+            &[Value::Str("test".to_string()), create_config_value_int(200)],
         )
         .unwrap();
 
@@ -636,10 +617,7 @@ mod tests {
         // Invalid type (int instead of string)
         let result = config_set(
             &mut vm,
-            &[
-                Value::Str("test".to_string()),
-                create_config_value_int(42),
-            ],
+            &[Value::Str("test".to_string()), create_config_value_int(42)],
         );
         assert!(result.is_err());
     }

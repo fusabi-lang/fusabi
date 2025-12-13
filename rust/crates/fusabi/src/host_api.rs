@@ -346,6 +346,28 @@ impl FusabiEngine {
         registry.call(name, &mut self.vm, args)
     }
 
+    /// Apply a function value (closure or native function) to arguments
+    ///
+    /// This method allows calling function values directly from Rust code.
+    ///
+    /// # Example
+    /// ```no_run
+    /// use fusabi::Engine;
+    /// use fusabi::Value;
+    ///
+    /// let mut engine = Engine::new();
+    ///
+    /// // Get a function value from evaluation
+    /// let func = engine.eval("fun x -> x * 2").unwrap();
+    ///
+    /// // Apply the function to an argument
+    /// let result = engine.apply(func, &[Value::Int(21)]).unwrap();
+    /// assert_eq!(result.as_int(), Some(42));
+    /// ```
+    pub fn apply(&mut self, func: Value, args: &[Value]) -> Result<Value, VmError> {
+        self.vm.call_value(func, args)
+    }
+
     /// Check if a host function is registered
     pub fn has_host_function(&self, name: &str) -> bool {
         self.host_registry.lock().unwrap().has_function(name)
@@ -610,5 +632,62 @@ mod tests {
         let list = Value::vec_to_cons(vec![Value::Int(1), Value::Int(2), Value::Int(3)]);
         let result = engine.call_host("sum_list", &[list]).unwrap();
         assert_eq!(result, Value::Int(6));
+    }
+
+    #[test]
+    fn test_apply_simple_closure() {
+        let mut engine = FusabiEngine::new();
+
+        // Create a simple closure
+        let func = engine.eval("fun x -> x * 2").unwrap();
+
+        // Apply the closure to an argument
+        let result = engine.apply(func, &[Value::Int(21)]).unwrap();
+        assert_eq!(result, Value::Int(42));
+    }
+
+    #[test]
+    fn test_apply_multiple_args() {
+        let mut engine = FusabiEngine::new();
+
+        // Test applying a function multiple times
+        let func1 = engine.eval("fun x -> x + 10").unwrap();
+        let result1 = engine.apply(func1, &[Value::Int(32)]).unwrap();
+        assert_eq!(result1, Value::Int(42));
+
+        // Test with another function
+        let func2 = engine.eval("fun x -> x * 3").unwrap();
+        let result2 = engine.apply(func2, &[Value::Int(14)]).unwrap();
+        assert_eq!(result2, Value::Int(42));
+    }
+
+    #[test]
+    fn test_apply_native_function() {
+        let mut engine = FusabiEngine::new();
+
+        // Use a built-in native function from stdlib
+        let func = engine.eval("String.length").unwrap();
+
+        // Apply the native function to a string
+        let result = engine.apply(func, &[Value::Str("hello".to_string())]).unwrap();
+        assert_eq!(result, Value::Int(5));
+    }
+
+    #[test]
+    fn test_apply_type_error() {
+        let mut engine = FusabiEngine::new();
+
+        // Try to apply a non-function value
+        let result = engine.apply(Value::Int(42), &[Value::Int(1)]);
+
+        // Should return a type mismatch error
+        assert!(result.is_err());
+        match result {
+            Err(VmError::TypeMismatch { expected, got }) => {
+                assert_eq!(expected, "function");
+                assert_eq!(got, "int");
+            }
+            _ => panic!("Expected TypeMismatch error"),
+        }
     }
 }

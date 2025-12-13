@@ -690,4 +690,131 @@ mod tests {
             _ => panic!("Expected TypeMismatch error"),
         }
     }
+
+    #[test]
+    fn test_module_namespace_in_eval() {
+        // Test for issue #242: Module functions should be visible in eval() context
+        let mut engine = FusabiEngine::new();
+
+        // Register a module with namespaced functions
+        let db_module = Module::new("db")
+            .register_fn2("append", |topic, data| {
+                let _topic_str = topic
+                    .as_str()
+                    .ok_or_else(|| VmError::Runtime("Expected string for topic".into()))?;
+                let _data_list = data
+                    .list_to_vec()
+                    .ok_or_else(|| VmError::Runtime("Expected list for data".into()))?;
+
+                // Return a simple success value (sequence number)
+                Ok(Value::Int(42))
+            })
+            .register_fn0("flush", || Ok(Value::Unit));
+
+        engine.register_module(db_module);
+
+        // Test calling module function via eval()
+        let result = engine
+            .eval(r#"db.append("topic", [1; 2; 3])"#)
+            .unwrap();
+        assert_eq!(result.as_int(), Some(42));
+
+        // Test calling another module function
+        let result2 = engine.eval("db.flush()").unwrap();
+        assert_eq!(result2, Value::Unit);
+    }
+
+    #[test]
+    fn test_module_function_in_let_binding() {
+        // Test using module functions in let bindings
+        let mut engine = FusabiEngine::new();
+
+        let math_module = Module::new("math")
+            .register_fn2("add", |a, b| {
+                let x = a
+                    .as_int()
+                    .ok_or_else(|| VmError::Runtime("Expected int".into()))?;
+                let y = b
+                    .as_int()
+                    .ok_or_else(|| VmError::Runtime("Expected int".into()))?;
+                Ok(Value::Int(x + y))
+            })
+            .register_fn2("multiply", |a, b| {
+                let x = a
+                    .as_int()
+                    .ok_or_else(|| VmError::Runtime("Expected int".into()))?;
+                let y = b
+                    .as_int()
+                    .ok_or_else(|| VmError::Runtime("Expected int".into()))?;
+                Ok(Value::Int(x * y))
+            });
+
+        engine.register_module(math_module);
+
+        // Use module functions in complex expressions
+        let result = engine
+            .eval("let x = math.add(10, 20) in math.multiply(x, 2)")
+            .unwrap();
+        assert_eq!(result.as_int(), Some(60));
+    }
+
+    #[test]
+    fn test_module_function_direct_call() {
+        // Test calling module functions directly (without intermediate binding)
+        let mut engine = FusabiEngine::new();
+
+        let str_module = Module::new("str")
+            .register_fn1("upper", |s| {
+                let text = s
+                    .as_str()
+                    .ok_or_else(|| VmError::Runtime("Expected string".into()))?;
+                Ok(Value::Str(text.to_uppercase()))
+            });
+
+        engine.register_module(str_module);
+
+        // Call module function directly
+        let result = engine.eval(r#"str.upper("hello")"#).unwrap();
+        assert_eq!(result.as_str(), Some("HELLO"));
+    }
+
+    #[test]
+    fn test_multiple_modules() {
+        // Test multiple modules in the same eval() context
+        let mut engine = FusabiEngine::new();
+
+        let module_a = Module::new("a").register_fn1("func", |x| {
+            let n = x
+                .as_int()
+                .ok_or_else(|| VmError::Runtime("Expected int".into()))?;
+            Ok(Value::Int(n + 10))
+        });
+
+        let module_b = Module::new("b").register_fn1("func", |x| {
+            let n = x
+                .as_int()
+                .ok_or_else(|| VmError::Runtime("Expected int".into()))?;
+            Ok(Value::Int(n * 2))
+        });
+
+        engine.register_module(module_a);
+        engine.register_module(module_b);
+
+        // Both modules should be accessible - use let bindings to make evaluation order explicit
+        let result = engine.eval("let x = a.func(5) in let y = b.func(10) in x + y").unwrap();
+        assert_eq!(result.as_int(), Some(35)); // (5 + 10) + (10 * 2) = 15 + 20 = 35
+    }
+
+    #[test]
+    fn test_undefined_module_function() {
+        // Test that undefined module functions produce proper error
+        let mut engine = FusabiEngine::new();
+
+        let module = Module::new("test").register_fn1("exists", |x| Ok(x));
+        engine.register_module(module);
+
+        // Try to call a non-existent function
+        let result = engine.eval("test.nonexistent(42)");
+        assert!(result.is_err());
+    }
 }

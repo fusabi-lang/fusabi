@@ -628,25 +628,29 @@ impl Compiler {
 
         let module_name = &module_path[0];
 
-        // Look up the qualified name in module registry
-        let expr = self
-            .module_registry
-            .as_ref()
-            .ok_or(CompileError::NoModuleContext)?
-            .resolve_qualified(module_name, name)
-            .ok_or_else(|| CompileError::UndefinedVariable(format!("{}.{}", module_name, name)))?;
+        // Try to look up the qualified name in module registry if available
+        if let Some(registry) = self.module_registry.as_ref() {
+            if let Some(expr) = registry.resolve_qualified(module_name, name) {
+                // For stdlib modules, the expression will be Expr::Var("Module.function")
+                // which represents a global reference. Compile it directly as global lookup
+                // to avoid infinite recursion.
+                if let Expr::Var(ref global_name) = expr {
+                    let idx = self.add_constant(Value::Str(global_name.clone()))?;
+                    self.emit(Instruction::LoadGlobal(idx));
+                    return Ok(());
+                }
 
-        // For stdlib modules, the expression will be Expr::Var("Module.function")
-        // which represents a global reference. Compile it directly as global lookup
-        // to avoid infinite recursion.
-        if let Expr::Var(ref global_name) = expr {
-            let idx = self.add_constant(Value::Str(global_name.clone()))?;
-            self.emit(Instruction::LoadGlobal(idx));
-            return Ok(());
+                // For user-defined modules, compile the expression normally
+                return self.compile_expr(&expr.clone());
+            }
         }
 
-        // For user-defined modules, compile the expression normally
-        self.compile_expr(&expr.clone())
+        // Fall back to treating qualified name as a runtime-resolved global
+        // This allows host functions registered via register_module() to work in eval()
+        let qualified_name = format!("{}.{}", module_name, name);
+        let idx = self.add_constant(Value::Str(qualified_name))?;
+        self.emit(Instruction::LoadGlobal(idx));
+        Ok(())
     }
     /// Compile a binary operation
     fn compile_binop(&mut self, op: BinOp, left: &Expr, right: &Expr) -> CompileResult<()> {
@@ -1764,6 +1768,40 @@ impl Compiler {
             ));
         }
 
+        // Special case: if receiver is a simple variable, check if "receiver.method_name"
+        // could be a module function (e.g., db.append where db is a module namespace)
+        // In that case, compile it as a regular function call instead of a method call
+        if let Expr::Var(module_name) = receiver {
+            let qualified_name = format!("{}.{}", module_name, method_name);
+
+            // Try to resolve it in the module registry first
+            let has_module_binding = self
+                .module_registry
+                .as_ref()
+                .and_then(|r| r.resolve_qualified(module_name, method_name))
+                .is_some();
+
+            // If not in module registry, assume it could be a runtime-registered host function
+            // and compile as a function call instead of a method call
+            if !has_module_binding {
+                // Load the function by qualified name
+                let name_idx = self.add_constant(Value::Str(qualified_name))?;
+                self.emit(Instruction::LoadGlobal(name_idx));
+
+                // Compile argument expressions
+                for arg in args {
+                    self.compile_expr(arg)?;
+                }
+
+                // Emit function call instruction
+                let arg_count = args.len() as u8;
+                self.emit(Instruction::Call(arg_count));
+
+                return Ok(());
+            }
+        }
+
+        // Standard method call compilation
         // Compile receiver expression
         self.compile_expr(receiver)?;
 

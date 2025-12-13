@@ -376,11 +376,25 @@ impl Vm {
                         }
                     };
 
-                    let value =
-                        self.globals.get(&name).cloned().ok_or_else(|| {
-                            VmError::Runtime(format!("Undefined global: {}", name))
-                        })?;
-                    self.push(value);
+                    // First check vm.globals
+                    if let Some(value) = self.globals.get(&name).cloned() {
+                        self.push(value);
+                    } else {
+                        // Fall back to checking host_registry for registered functions
+                        let has_host_fn = self.host_registry.lock().unwrap().has_function(&name);
+
+                        if has_host_fn {
+                            // Create a NativeFn value with arity 0 (dynamic arity)
+                            // The arity will be checked when the function is actually called
+                            self.push(Value::NativeFn {
+                                name: name.clone(),
+                                arity: 0,  // 0 means dynamic arity
+                                args: vec![],
+                            });
+                        } else {
+                            return Err(VmError::Runtime(format!("Undefined global: {}", name)));
+                        }
+                    }
                 }
 
                 Instruction::Pop => {
@@ -733,16 +747,10 @@ impl Vm {
                             let total_args = all_args.len();
                             let arity_usize = arity as usize;
 
-                            if total_args < arity_usize {
-                                // Partial application: return new NativeFn with accumulated args
-                                self.push(Value::NativeFn {
-                                    name: name.clone(),
-                                    arity,
-                                    args: all_args,
-                                });
-                            } else if total_args == arity_usize {
-                                // Exact match: execute
-                                // Call via registry
+                            // Special case: arity 0 means dynamic arity (accepts any number of args)
+                            // This is used for host functions registered without specific arity info
+                            if arity == 0 || total_args == arity_usize {
+                                // Execute the function
                                 let host_fn = {
                                     let registry = self.host_registry.lock().unwrap();
                                     registry.get(&name)
@@ -757,6 +765,13 @@ impl Vm {
                                         name
                                     )));
                                 }
+                            } else if total_args < arity_usize {
+                                // Partial application: return new NativeFn with accumulated args
+                                self.push(Value::NativeFn {
+                                    name: name.clone(),
+                                    arity,
+                                    args: all_args,
+                                });
                             } else {
                                 // Over-application: execute with first 'arity' args, then call result with rest
                                 // For Phase 1/2/3, let's just error or handle simple case

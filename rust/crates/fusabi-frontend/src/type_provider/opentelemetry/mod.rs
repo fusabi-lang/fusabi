@@ -6,7 +6,7 @@
 //!
 //! # Usage
 //!
-//! ```fsharp
+//! ```text
 //! // Load conventions from a version or file
 //! type OTel = OpenTelemetryProvider<"1.24.0">
 //! type OTel = OpenTelemetryProvider<"file://./semantic-conventions.yaml">

@@ -14,7 +14,7 @@
 //! use fusabi_tui_core::layout::Rect;
 //! use std::io::stdout;
 //!
-//! # fn main() -> Result<(), Box<dyn std::error::Error>> {
+//! # fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
 //! // Create a crossterm renderer
 //! let mut renderer = CrosstermRenderer::new(stdout())?;
 //!

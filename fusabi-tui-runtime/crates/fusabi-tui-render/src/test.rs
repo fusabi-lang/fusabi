@@ -124,8 +124,7 @@ impl Renderer for TestRenderer {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use fusabi_tui_core::buffer::Cell;
-    use fusabi_tui_core::style::{Color, Modifier, Style};
+    use fusabi_tui_core::style::Style;
 
     #[test]
     fn test_new() {

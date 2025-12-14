@@ -132,19 +132,19 @@ impl<W: Write + Send> CrosstermRenderer<W> {
 
     /// Renders a single cell at the specified position.
     fn render_cell(&mut self, x: u16, y: u16, cell: &Cell) -> Result<()> {
-        use crossterm::{cursor::MoveTo, style::*, Command};
+        use crossterm::{cursor::MoveTo, style::*};
 
         // Move cursor to position
-        MoveTo(x, y).execute(&mut self.writer)?;
+        self.writer.execute(MoveTo(x, y))?;
 
         // Reset attributes
         crossterm::execute!(self.writer, SetAttribute(Attribute::Reset))?;
 
         // Set foreground color
-        SetForegroundColor(Self::convert_color(cell.fg)).execute(&mut self.writer)?;
+        self.writer.execute(SetForegroundColor(Self::convert_color(cell.fg)))?;
 
         // Set background color
-        SetBackgroundColor(Self::convert_color(cell.bg)).execute(&mut self.writer)?;
+        self.writer.execute(SetBackgroundColor(Self::convert_color(cell.bg)))?;
 
         // Apply modifiers
         self.apply_modifiers(cell.modifier)?;
@@ -206,25 +206,25 @@ impl<W: Write + Send> Renderer for CrosstermRenderer<W> {
     }
 
     fn clear(&mut self) -> Result<()> {
-        use crossterm::{terminal::Clear, terminal::ClearType, Command};
-        Clear(ClearType::All).execute(&mut self.writer)?;
+        use crossterm::{terminal::Clear, terminal::ClearType};
+        self.writer.execute(Clear(ClearType::All))?;
         self.last_buffer = None;
         Ok(())
     }
 
     fn show_cursor(&mut self, show: bool) -> Result<()> {
-        use crossterm::{cursor::Hide, cursor::Show, Command};
+        use crossterm::{cursor::Hide, cursor::Show};
         if show {
-            Show.execute(&mut self.writer)?;
+            self.writer.execute(Show)?;
         } else {
-            Hide.execute(&mut self.writer)?;
+            self.writer.execute(Hide)?;
         }
         Ok(())
     }
 
     fn set_cursor(&mut self, x: u16, y: u16) -> Result<()> {
-        use crossterm::{cursor::MoveTo, Command};
-        MoveTo(x, y).execute(&mut self.writer)?;
+        use crossterm::cursor::MoveTo;
+        self.writer.execute(MoveTo(x, y))?;
         Ok(())
     }
 }

@@ -3,7 +3,7 @@
 use fusabi_tui_core::buffer::Buffer;
 use fusabi_tui_core::layout::Rect;
 
-use crate::error::{RenderError, Result};
+use crate::error::Result;
 
 /// A renderer that can draw buffers to a terminal or other output device.
 ///

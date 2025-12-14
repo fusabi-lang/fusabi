@@ -293,6 +293,9 @@ fn mark_value(value: &Value, tracer: &mut Tracer, objects: &HashMap<usize, GcObj
         | Value::Nil => {}
         // HostData is managed by Rust's reference counting
         Value::HostData(_) => {}
+        // Async values are managed by the AsyncRuntime
+        #[cfg(feature = "async")]
+        Value::Async(_) => {}
     }
 }
 
@@ -366,6 +369,8 @@ fn estimate_value_size(value: &Value) -> usize {
             name.len() + args.iter().map(estimate_value_size).sum::<usize>()
         }
         Value::HostData(_) => 8, // Just the Rc pointer
+        #[cfg(feature = "async")]
+        Value::Async(_) => 16, // TaskId or boxed value
     }
 }
 

@@ -13,6 +13,12 @@ pub mod stdlib;
 pub mod value;
 pub mod vm;
 
+// Async modules (feature-gated)
+#[cfg(feature = "async")]
+pub mod async_types;
+#[cfg(feature = "async")]
+pub mod async_runtime;
+
 pub use chunk::{Chunk, ChunkBuilder, SourceSpan};
 pub use closure::{Closure, Upvalue};
 pub use error_reporter::{format_error, RuntimeError};
@@ -22,6 +28,12 @@ pub use instruction::Instruction;
 pub use optimized_vm::FastVm;
 pub use value::{HostData, Value};
 pub use vm::{Frame, Vm, VmError};
+
+// Async re-exports (feature-gated)
+#[cfg(feature = "async")]
+pub use async_runtime::AsyncRuntime;
+#[cfg(feature = "async")]
+pub use async_types::{AsyncState, AsyncValue, TaskId};
 
 /// Magic bytes for Fusabi Bytecode files (.fzb)
 pub const FZB_MAGIC: &[u8] = b"FZB\x01";

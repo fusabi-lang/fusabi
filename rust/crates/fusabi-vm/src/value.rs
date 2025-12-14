@@ -190,6 +190,11 @@ pub enum Value {
     /// It exists only for runtime host-guest interop.
     #[cfg_attr(feature = "serde", serde(skip))]
     HostData(HostData),
+    /// Async value (Tokio-backed async computation)
+    /// Only available when the 'async' feature is enabled
+    #[cfg(feature = "async")]
+    #[cfg_attr(feature = "serde", serde(skip))]
+    Async(crate::async_types::AsyncValue),
 }
 
 impl PartialEq for Value {
@@ -243,6 +248,8 @@ impl PartialEq for Value {
                 },
             ) => n1 == n2 && a1 == a2 && args1 == args2,
             (Value::HostData(a), Value::HostData(b)) => a == b,
+            #[cfg(feature = "async")]
+            (Value::Async(a), Value::Async(b)) => a == b,
             _ => false,
         }
     }
@@ -268,6 +275,8 @@ impl Value {
             Value::Closure(_) => "function",
             Value::NativeFn { .. } => "function",
             Value::HostData(_) => "host_data",
+            #[cfg(feature = "async")]
+            Value::Async(_) => "async",
         }
     }
 
@@ -356,6 +365,8 @@ impl Value {
             Value::Closure(_) => true,
             Value::NativeFn { .. } => true,
             Value::HostData(_) => true,
+            #[cfg(feature = "async")]
+            Value::Async(_) => true,
         }
     }
 
@@ -750,6 +761,8 @@ impl fmt::Display for Value {
             Value::Closure(c) => write!(f, "{}", c),
             Value::NativeFn { name, .. } => write!(f, "<native fn {}>", name),
             Value::HostData(hd) => write!(f, "<host object: {}>", hd.type_name()),
+            #[cfg(feature = "async")]
+            Value::Async(av) => write!(f, "{}", av),
         }
     }
 }

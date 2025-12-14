@@ -1,12 +1,14 @@
-// Fusabi Async Standard Library
-// Provides runtime support for Computation Expressions (Async Builder)
+//! Async operations for Fusabi VM (Tokio-backed)
+//!
+//! This module provides standard library functions for real async computation expressions
+//! backed by Tokio runtime.
 
-use crate::value::Value;
-use crate::vm::{Vm, VmError};
+#[cfg(feature = "async")]
+use crate::async_types::{AsyncState, AsyncValue, TaskId};
+use crate::{Value, Vm, VmError};
 
-// In this initial synchronous implementation:
-// Async<'a> is represented as a Closure (unit -> 'a)
-// This allows "executing" it by calling it.
+// Synchronous free-monad based async implementations
+// These are used for computation expression desugaring
 
 /// Async.Return : 'a -> Async<'a>
 /// Creates an async computation that returns a value
@@ -82,7 +84,6 @@ pub fn async_zero(_vm: &mut Vm, _args: &[Value]) -> Result<Value, VmError> {
 }
 
 /// Async.Combine : Async<unit> -> Async<'a> -> Async<'a>
-/// Used for sequencing: do! a; b
 pub fn async_combine(_vm: &mut Vm, args: &[Value]) -> Result<Value, VmError> {
     if args.len() != 2 {
         return Err(VmError::Runtime(
@@ -93,12 +94,6 @@ pub fn async_combine(_vm: &mut Vm, args: &[Value]) -> Result<Value, VmError> {
     let first = args[0].clone();
     let second = args[1].clone();
 
-    // Bind(first, fun () -> second)
-    // But we can't easily create the lambda "fun () -> second" from Rust.
-    // However, if we define Combine in terms of the variant structure:
-    // We can introduce a specific "Combine" variant, or just use Bind if we can create the lambda.
-
-    // Simpler: Let's introduce a Combine variant to the Free Monad.
     Ok(Value::Variant {
         type_name: "Async".to_string(),
         variant_name: "Combine".to_string(),
@@ -107,7 +102,6 @@ pub fn async_combine(_vm: &mut Vm, args: &[Value]) -> Result<Value, VmError> {
 }
 
 /// Async.RunSynchronously : Async<'a> -> 'a
-/// Interprets the Async Free Monad
 pub fn async_run_synchronously(vm: &mut Vm, args: &[Value]) -> Result<Value, VmError> {
     if args.len() != 1 {
         return Err(VmError::Runtime(
@@ -116,9 +110,6 @@ pub fn async_run_synchronously(vm: &mut Vm, args: &[Value]) -> Result<Value, VmE
     }
 
     let mut current = args[0].clone();
-
-    // We need a stack of continuations to handle Bind/Combine
-    // Since Bind(m, f) means "run m, then run f result", we process 'm' and push 'f' to stack.
     let mut continuations: Vec<Value> = Vec::new();
 
     loop {
@@ -127,102 +118,48 @@ pub fn async_run_synchronously(vm: &mut Vm, args: &[Value]) -> Result<Value, VmE
                 variant_name,
                 fields,
                 ..
-            } => {
-                match variant_name.as_str() {
-                    "Pure" => {
-                        let result = fields[0].clone();
-                        if let Some(continuation) = continuations.pop() {
-                            // We have a continuation (function) waiting for this result
-                            // Execute continuation(result) -> returns new Async
-                            current = vm.call_value(continuation, &[result])?;
-                        } else {
-                            // No more continuations, this is the final result
-                            return Ok(result);
-                        }
-                    }
-                    "Bind" => {
-                        let computation = fields[0].clone();
-                        let binder = fields[1].clone();
-                        // Push binder to continuations
-                        continuations.push(binder);
-                        // Process inner computation
-                        current = computation;
-                    }
-                    "Combine" => {
-                        let first = fields[0].clone();
-                        let second = fields[1].clone();
-                        // Combine(a, b) is semantically Bind(a, fun _ -> b)
-                        // We need to construct a "const b" function?
-                        // Or handle "Combine" specially in the continuation stack?
-                        // Let's make continuations support specific actions.
-                        // But Value::NativeFn is hard to synthesize.
-
-                        // Hack: Register a "CombineContinuation" variant in our internal logic?
-                        // No, let's just optimize:
-                        // We push 'second' as a "computation to run next", ignoring the previous result.
-                        // But 'continuations' stores FUNCTIONS.
-                        // We need to wrap 'second' in a function `fun _ -> second`.
-
-                        // Since we are in Rust, we can cheat again.
-                        // Let's create a native function closure that captures 'second' and returns it.
-                        // Warning: This requires `vm` reference which we have.
-                        // BUT `Value` cannot hold a Rust closure directly unless it's `HostData`.
-                        // `Value::NativeFn` holds name+args. We can't create anonymous ones easily.
-
-                        // Alternative: Push a special marker to `continuations`?
-                        // But `vm.call_value` expects a function.
-
-                        // Let's define `Async.Combine` as `Bind` in the compiler desugaring?
-                        // The compiler currently desugars `stmt; rest` to `Combine`.
-                        // If we change `Async.Combine` to return `Bind(first, fun _ -> second)`...
-                        // We still have the problem of creating `fun _ -> second`.
-
-                        // Okay, let's handle "Combine" explicitly in the interpreter loop.
-                        // We need a stack of "Tasks".
-                        // Frame: (Binder(func) | Next(async))
-                        // This loop structure is getting complex for a simple `impl`.
-
-                        // RESTARTING STRATEGY:
-                        // Desugar `Combine(a, b)` at the COMPILER level to `Bind(a, fun _ -> b)`?
-                        // Yes, `compiler.rs` already does `Delay(fun _ -> rest)`.
-                        // So `Combine(a, b)` is `Combine(a, Delay(fun _ -> b))` in the compiler.
-                        // The `Async.Combine` implementation here just needs to handle that.
-                        // Signature: Combine : Async<unit> -> Async<'a> -> Async<'a>
-                        // But wait, if the second arg is ALREADY a Delay (which is Async),
-                        // then Combine just takes two Asyncs.
-
-                        // Let's treat Combine as Bind where we discard the result.
-                        // We need to create a binder function that returns `second`.
-                        // `async_combiner_helper(ignored_val, second_computation)`
-                        // We can register a native helper `Async.Internal.CombineHelper`
-                        // and return `Bind(first, NativeFn("CombineHelper", [second]))`.
-
-                        let helper = Value::NativeFn {
-                            name: "Async.Internal.CombineHelper".to_string(),
-                            arity: 2,           // takes (second, ignored_result)
-                            args: vec![second], // Partially applied 'second'
-                        };
-
-                        // Return Bind(first, helper)
-                        current = Value::Variant {
-                            type_name: "Async".to_string(),
-                            variant_name: "Bind".to_string(),
-                            fields: vec![first, helper],
-                        };
-                    }
-                    "Delay" => {
-                        let generator = fields[0].clone();
-                        // Call generator(unit) -> async_computation
-                        current = vm.call_value(generator, &[Value::Unit])?;
-                    }
-                    _ => {
-                        return Err(VmError::Runtime(format!(
-                            "Unknown Async variant: {}",
-                            variant_name
-                        )))
+            } => match variant_name.as_str() {
+                "Pure" => {
+                    let result = fields[0].clone();
+                    if let Some(continuation) = continuations.pop() {
+                        current = vm.call_value(continuation, &[result])?;
+                    } else {
+                        return Ok(result);
                     }
                 }
-            }
+                "Bind" => {
+                    let computation = fields[0].clone();
+                    let binder = fields[1].clone();
+                    continuations.push(binder);
+                    current = computation;
+                }
+                "Combine" => {
+                    let first = fields[0].clone();
+                    let second = fields[1].clone();
+
+                    let helper = Value::NativeFn {
+                        name: "Async.Internal.CombineHelper".to_string(),
+                        arity: 2,
+                        args: vec![second],
+                    };
+
+                    current = Value::Variant {
+                        type_name: "Async".to_string(),
+                        variant_name: "Bind".to_string(),
+                        fields: vec![first, helper],
+                    };
+                }
+                "Delay" => {
+                    let generator = fields[0].clone();
+                    current = vm.call_value(generator, &[Value::Unit])?;
+                }
+                _ => {
+                    return Err(VmError::Runtime(format!(
+                        "Unknown Async variant: {}",
+                        variant_name
+                    )))
+                }
+            },
             _ => {
                 return Err(VmError::TypeMismatch {
                     expected: "Async variant",
@@ -234,15 +171,207 @@ pub fn async_run_synchronously(vm: &mut Vm, args: &[Value]) -> Result<Value, VmE
 }
 
 /// Helper function for Combine
-/// Async.Internal.CombineHelper : Async<'a> -> 'b -> Async<'a>
-/// Returns the first argument (the next computation), ignoring the second (the result of previous).
 pub fn async_combine_helper(_vm: &mut Vm, args: &[Value]) -> Result<Value, VmError> {
     if args.len() != 2 {
         return Err(VmError::Runtime(
             "CombineHelper expects 2 arguments".to_string(),
         ));
     }
-    // args[0] is the next computation (captured)
-    // args[1] is the result of the previous computation (ignored)
     Ok(args[0].clone())
+}
+
+// Tokio-backed async implementations (when async feature is enabled)
+#[cfg(feature = "async")]
+pub mod tokio_async {
+    use super::*;
+
+    /// Register all Tokio-backed async operations with the VM
+    pub fn register_tokio_async_ops(vm: &mut Vm) -> Result<(), VmError> {
+        // Enable async runtime
+        vm.enable_async()?;
+
+        let registry = vm.host_registry.clone();
+        let mut reg = registry.lock().unwrap();
+
+        // Async.sleep: int -> Async<unit>
+        reg.register("Async.sleep", |vm: &mut Vm, args: &[Value]| {
+            if args.len() != 1 {
+                return Err(VmError::Runtime(format!(
+                    "Async.sleep expects 1 argument, got {}",
+                    args.len()
+                )));
+            }
+
+            let millis = args[0].as_int().ok_or_else(|| {
+                VmError::Runtime("Async.sleep expects int argument".to_string())
+            })?;
+
+            let task_id = vm.exec_async(move || {
+                std::thread::sleep(std::time::Duration::from_millis(millis as u64));
+                Ok(Value::Unit)
+            })?;
+
+            Ok(Value::Async(AsyncValue::Task(task_id)))
+        });
+
+        // Async.parallel: List<Async<'a>> -> Async<List<'a>>
+        reg.register("Async.parallel", |vm: &mut Vm, args: &[Value]| {
+            if args.len() != 1 {
+                return Err(VmError::Runtime(format!(
+                    "Async.parallel expects 1 argument, got {}",
+                    args.len()
+                )));
+            }
+
+            let tasks = args[0].list_to_vec().ok_or_else(|| {
+                VmError::Runtime("Async.parallel expects list argument".to_string())
+            })?;
+
+            let task_ids: Result<Vec<TaskId>, VmError> = tasks
+                .iter()
+                .map(|v| match v {
+                    Value::Async(AsyncValue::Task(id)) => Ok(*id),
+                    _ => Err(VmError::Runtime(
+                        "Async.parallel expects list of Async values".to_string(),
+                    )),
+                })
+                .collect();
+
+            let task_ids = task_ids?;
+            let runtime_clone = vm.async_runtime.as_ref().unwrap().clone();
+
+            let task_id = vm.exec_async(move || {
+                let mut results = Vec::new();
+                for id in task_ids {
+                    let result = runtime_clone.block_on(id)?;
+                    results.push(result);
+                }
+                Ok(Value::vec_to_cons(results))
+            })?;
+
+            Ok(Value::Async(AsyncValue::Task(task_id)))
+        });
+
+        // Async.withTimeout: int -> Async<'a> -> Async<Option<'a>>
+        reg.register("Async.withTimeout", |vm: &mut Vm, args: &[Value]| {
+            if args.len() != 2 {
+                return Err(VmError::Runtime(format!(
+                    "Async.withTimeout expects 2 arguments, got {}",
+                    args.len()
+                )));
+            }
+
+            let timeout_ms = args[0].as_int().ok_or_else(|| {
+                VmError::Runtime("Async.withTimeout expects int as first argument".to_string())
+            })?;
+
+            let task_id = match &args[1] {
+                Value::Async(AsyncValue::Task(id)) => *id,
+                _ => {
+                    return Err(VmError::Runtime(
+                        "Async.withTimeout expects Async value as second argument".to_string(),
+                    ))
+                }
+            };
+
+            let runtime_clone = vm.async_runtime.as_ref().unwrap().clone();
+            let timeout_task_id = vm.exec_async(move || {
+                let start = std::time::Instant::now();
+                loop {
+                    let state = runtime_clone.poll(task_id);
+                    match state {
+                        AsyncState::Pending => {
+                            if start.elapsed().as_millis() > timeout_ms as u128 {
+                                let _ = runtime_clone.cancel(task_id);
+                                return Ok(Value::Variant {
+                                    type_name: "Option".to_string(),
+                                    variant_name: "None".to_string(),
+                                    fields: vec![],
+                                });
+                            }
+                            std::thread::sleep(std::time::Duration::from_millis(1));
+                        }
+                        AsyncState::Ready(v) => {
+                            return Ok(Value::Variant {
+                                type_name: "Option".to_string(),
+                                variant_name: "Some".to_string(),
+                                fields: vec![v],
+                            });
+                        }
+                        AsyncState::Failed(e) => {
+                            return Err(VmError::Runtime(e));
+                        }
+                        AsyncState::Cancelled => {
+                            return Ok(Value::Variant {
+                                type_name: "Option".to_string(),
+                                variant_name: "None".to_string(),
+                                fields: vec![],
+                            });
+                        }
+                    }
+                }
+            })?;
+
+            Ok(Value::Async(AsyncValue::Task(timeout_task_id)))
+        });
+
+        // Async.catch: Async<'a> -> Async<Result<'a, string>>
+        reg.register("Async.catch", |vm: &mut Vm, args: &[Value]| {
+            if args.len() != 1 {
+                return Err(VmError::Runtime(format!(
+                    "Async.catch expects 1 argument, got {}",
+                    args.len()
+                )));
+            }
+
+            let task_id = match &args[0] {
+                Value::Async(AsyncValue::Task(id)) => *id,
+                _ => {
+                    return Err(VmError::Runtime(
+                        "Async.catch expects Async value".to_string(),
+                    ))
+                }
+            };
+
+            let runtime_clone = vm.async_runtime.as_ref().unwrap().clone();
+            let catch_task_id = vm.exec_async(move || {
+                match runtime_clone.block_on(task_id) {
+                    Ok(v) => Ok(Value::Variant {
+                        type_name: "Result".to_string(),
+                        variant_name: "Ok".to_string(),
+                        fields: vec![v],
+                    }),
+                    Err(e) => Ok(Value::Variant {
+                        type_name: "Result".to_string(),
+                        variant_name: "Error".to_string(),
+                        fields: vec![Value::Str(format!("{}", e))],
+                    }),
+                }
+            })?;
+
+            Ok(Value::Async(AsyncValue::Task(catch_task_id)))
+        });
+
+        // Async.cancel: Async<'a> -> unit
+        reg.register("Async.cancel", |vm: &mut Vm, args: &[Value]| {
+            if args.len() != 1 {
+                return Err(VmError::Runtime(format!(
+                    "Async.cancel expects 1 argument, got {}",
+                    args.len()
+                )));
+            }
+
+            match &args[0] {
+                Value::Async(AsyncValue::Task(task_id)) => {
+                    vm.cancel_async(*task_id)?;
+                    Ok(Value::Unit)
+                }
+                _ => Err(VmError::Runtime(
+                    "Async.cancel expects Async value".to_string(),
+                )),
+            }
+        });
+
+        Ok(())
+    }
 }

@@ -130,6 +130,9 @@ pub struct Vm {
     pub host_registry: Arc<Mutex<HostRegistry>>,
     /// Garbage collector heap
     pub gc_heap: GcHeap,
+    /// Async runtime (Tokio-backed)
+    #[cfg(feature = "async")]
+    pub async_runtime: Option<Arc<crate::async_runtime::AsyncRuntime>>,
 }
 
 impl Vm {
@@ -144,6 +147,8 @@ impl Vm {
             globals: HashMap::new(),
             host_registry: Arc::new(Mutex::new(HostRegistry::new())),
             gc_heap: GcHeap::new(),
+            #[cfg(feature = "async")]
+            async_runtime: None,
         }
     }
 
@@ -155,6 +160,8 @@ impl Vm {
             globals: HashMap::new(),
             host_registry: Arc::new(Mutex::new(HostRegistry::new())),
             gc_heap: GcHeap::new(),
+            #[cfg(feature = "async")]
+            async_runtime: None,
         }
     }
 
@@ -166,6 +173,8 @@ impl Vm {
             globals: HashMap::new(),
             host_registry: Arc::new(Mutex::new(HostRegistry::new())),
             gc_heap: GcHeap::with_threshold(threshold),
+            #[cfg(feature = "async")]
+            async_runtime: None,
         }
     }
 
@@ -1482,6 +1491,66 @@ impl Vm {
     /// Get the current frame count (for debugging)
     pub fn frame_count(&self) -> usize {
         self.frames.len()
+    }
+
+    /// Enable async runtime (Tokio-backed)
+    /// This must be called before using async operations
+    #[cfg(feature = "async")]
+    pub fn enable_async(&mut self) -> Result<(), VmError> {
+        if self.async_runtime.is_none() {
+            let runtime = crate::async_runtime::AsyncRuntime::new()
+                .map_err(|e| VmError::Runtime(format!("Failed to create async runtime: {}", e)))?;
+            self.async_runtime = Some(Arc::new(runtime));
+        }
+        Ok(())
+    }
+
+    /// Execute an async task and return a TaskId
+    /// The task is a closure that runs synchronously but is scheduled on the Tokio runtime
+    #[cfg(feature = "async")]
+    pub fn exec_async<F>(&mut self, task: F) -> Result<crate::async_types::TaskId, VmError>
+    where
+        F: FnOnce() -> Result<Value, VmError> + Send + 'static,
+    {
+        let runtime = self
+            .async_runtime
+            .as_ref()
+            .ok_or_else(|| VmError::Runtime("Async runtime not enabled. Call enable_async() first.".to_string()))?;
+
+        let task_id = runtime.spawn(task);
+        Ok(task_id)
+    }
+
+    /// Block until an async task completes and return its result
+    #[cfg(feature = "async")]
+    pub fn await_async(&self, task_id: crate::async_types::TaskId) -> Result<Value, VmError> {
+        let runtime = self
+            .async_runtime
+            .as_ref()
+            .ok_or_else(|| VmError::Runtime("Async runtime not enabled".to_string()))?;
+
+        runtime.block_on(task_id)
+    }
+
+    /// Non-blocking poll for async task status
+    #[cfg(feature = "async")]
+    pub fn poll_async(&self, task_id: crate::async_types::TaskId) -> crate::async_types::AsyncState {
+        if let Some(runtime) = self.async_runtime.as_ref() {
+            runtime.poll(task_id)
+        } else {
+            crate::async_types::AsyncState::Failed("Async runtime not enabled".to_string())
+        }
+    }
+
+    /// Cancel a running async task
+    #[cfg(feature = "async")]
+    pub fn cancel_async(&self, task_id: crate::async_types::TaskId) -> Result<(), VmError> {
+        let runtime = self
+            .async_runtime
+            .as_ref()
+            .ok_or_else(|| VmError::Runtime("Async runtime not enabled".to_string()))?;
+
+        runtime.cancel(task_id)
     }
 }
 

@@ -1,6 +1,6 @@
 //! Type generation utilities for type providers
 
-use crate::types::{RecordDef, DuDef, VariantDef, TypeExpr, TypeDefinition};
+use crate::types::{DuDef, RecordDef, TypeDefinition, TypeExpr, VariantDef};
 
 /// Generated types from a provider
 #[derive(Debug, Clone)]
@@ -94,7 +94,8 @@ impl TypeGenerator {
     pub fn make_record(&self, name: &str, fields: Vec<(String, TypeExpr)>) -> RecordDef {
         RecordDef {
             name: self.naming.apply(name),
-            fields: fields.into_iter()
+            fields: fields
+                .into_iter()
                 .map(|(n, t)| (self.naming.apply(&n), t))
                 .collect(),
         }

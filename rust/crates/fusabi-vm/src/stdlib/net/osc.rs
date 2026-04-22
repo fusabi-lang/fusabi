@@ -120,7 +120,7 @@ pub fn osc_client(_vm: &mut crate::vm::Vm, args: &[Value]) -> Result<Value, VmEr
 }
 
 #[cfg(feature = "osc")]
-/// Osc.send : OscClient -> string -> list<obj> -> unit
+/// Osc.send : OscClient -> string -> `list<obj>` -> unit
 /// Send an OSC message with arguments to the specified address
 /// Example: client |> Osc.send "/transport_play" [1; "test"]
 pub fn osc_send(_vm: &mut crate::vm::Vm, args: &[Value]) -> Result<Value, VmError> {

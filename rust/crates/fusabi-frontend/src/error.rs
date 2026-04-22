@@ -512,7 +512,11 @@ impl fmt::Display for TypeError {
                 extra_fields,
                 missing_fields,
             } => {
-                writeln!(f, "Field mismatch in type '{}' from type provider", type_name)?;
+                writeln!(
+                    f,
+                    "Field mismatch in type '{}' from type provider",
+                    type_name
+                )?;
                 if !extra_fields.is_empty() {
                     writeln!(f, "  Extra fields: {}", extra_fields.join(", "))?;
                 }

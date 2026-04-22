@@ -80,7 +80,7 @@ pub fn sqlite_execute(conn_id: &Value, sql: &Value) -> Result<Value, VmError> {
 }
 
 #[cfg(feature = "sqlite")]
-/// Sqlite.query : int -> string -> list<map>
+/// Sqlite.query : int -> string -> `list<map>`
 /// Executes a SQL query and returns rows as a list of maps
 pub fn sqlite_query(conn_id: &Value, sql: &Value) -> Result<Value, VmError> {
     let id = match conn_id {

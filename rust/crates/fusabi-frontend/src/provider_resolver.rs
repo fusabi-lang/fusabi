@@ -138,7 +138,10 @@ impl ProviderResolver {
     }
 
     /// Convert provider-generated types to AST types
-    fn convert_generated_types(&self, generated: &GeneratedTypes) -> ResolverResult<Vec<AstTypeDef>> {
+    fn convert_generated_types(
+        &self,
+        generated: &GeneratedTypes,
+    ) -> ResolverResult<Vec<AstTypeDef>> {
         let mut result = Vec::new();
 
         // Convert root types
@@ -179,7 +182,11 @@ impl ProviderResolver {
                     .iter()
                     .map(|v| AstVariantDef {
                         name: v.name.clone(),
-                        fields: v.fields.iter().map(|ty| self.convert_type_expr(ty)).collect(),
+                        fields: v
+                            .fields
+                            .iter()
+                            .map(|ty| self.convert_type_expr(ty))
+                            .collect(),
                     })
                     .collect();
 
@@ -243,10 +250,7 @@ impl ProviderResolver {
                                 .iter()
                                 .map(|f| self.ast_type_to_type(f))
                                 .collect();
-                            Type::Function(
-                                Box::new(Type::Tuple(tuple_fields)),
-                                Box::new(du_type),
-                            )
+                            Type::Function(Box::new(Type::Tuple(tuple_fields)), Box::new(du_type))
                         };
                         schemes.insert(variant.name.clone(), TypeScheme::mono(variant_type));
                     }

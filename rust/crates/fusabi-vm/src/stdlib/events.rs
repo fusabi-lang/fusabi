@@ -150,7 +150,7 @@ pub fn events_emit(vm: &mut Vm, args: &[Value]) -> Result<Value, VmError> {
     Ok(Value::Unit)
 }
 
-/// Events.emitAsync : string -> 'a -> Async<unit>
+/// Events.emitAsync : string -> 'a -> Async\<unit\>
 /// Emit an event asynchronously. Returns immediately while handlers run.
 /// Note: In current implementation, this is synchronous but designed for future async support.
 ///

@@ -318,7 +318,11 @@ pub struct TypeProviderDecl {
 
 impl fmt::Display for TypeProviderDecl {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "type {} = {}<\"{}\">", self.name, self.provider, self.source)
+        write!(
+            f,
+            "type {} = {}<\"{}\">",
+            self.name, self.provider, self.source
+        )
     }
 }
 
@@ -334,7 +338,12 @@ impl TypeProviderDecl {
     }
 
     /// Create a type provider declaration with parameters.
-    pub fn with_params(name: String, provider: String, source: String, params: Vec<(String, String)>) -> Self {
+    pub fn with_params(
+        name: String,
+        provider: String,
+        source: String,
+        params: Vec<(String, String)>,
+    ) -> Self {
         TypeProviderDecl {
             name,
             provider,

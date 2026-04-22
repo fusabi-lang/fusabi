@@ -1,6 +1,6 @@
 //! Core type provider trait and infrastructure
 
-use crate::error::{ProviderResult};
+use crate::error::ProviderResult;
 use crate::generator::GeneratedTypes;
 use std::collections::HashMap;
 

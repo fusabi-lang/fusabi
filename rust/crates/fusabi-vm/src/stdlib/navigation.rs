@@ -347,7 +347,7 @@ pub fn nav_jump_to_anchor(_vm: &mut crate::vm::Vm, args: &[Value]) -> Result<Val
     })
 }
 
-/// Nav.getCurrentAnchor() -> Option<string>
+/// Nav.getCurrentAnchor() -> `Option<string>`
 /// Returns the current anchor/focusable id if any
 pub fn nav_get_current_anchor(_vm: &mut crate::vm::Vm, _args: &[Value]) -> Result<Value, VmError> {
     let state = NAV_STATE

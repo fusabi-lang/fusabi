@@ -397,7 +397,7 @@ impl Vm {
                             // The arity will be checked when the function is actually called
                             self.push(Value::NativeFn {
                                 name: name.clone(),
-                                arity: 0,  // 0 means dynamic arity
+                                arity: 0, // 0 means dynamic arity
                                 args: vec![],
                             });
                         } else {
@@ -1512,10 +1512,9 @@ impl Vm {
     where
         F: FnOnce() -> Result<Value, VmError> + Send + 'static,
     {
-        let runtime = self
-            .async_runtime
-            .as_ref()
-            .ok_or_else(|| VmError::Runtime("Async runtime not enabled. Call enable_async() first.".to_string()))?;
+        let runtime = self.async_runtime.as_ref().ok_or_else(|| {
+            VmError::Runtime("Async runtime not enabled. Call enable_async() first.".to_string())
+        })?;
 
         let task_id = runtime.spawn(task);
         Ok(task_id)
@@ -1534,7 +1533,10 @@ impl Vm {
 
     /// Non-blocking poll for async task status
     #[cfg(feature = "async")]
-    pub fn poll_async(&self, task_id: crate::async_types::TaskId) -> crate::async_types::AsyncState {
+    pub fn poll_async(
+        &self,
+        task_id: crate::async_types::TaskId,
+    ) -> crate::async_types::AsyncState {
         if let Some(runtime) = self.async_runtime.as_ref() {
             runtime.poll(task_id)
         } else {

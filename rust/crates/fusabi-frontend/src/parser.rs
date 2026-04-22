@@ -564,7 +564,10 @@ impl Parser {
                 vec![]
             };
 
-            variants.push(VariantDef { name: variant_name, fields });
+            variants.push(VariantDef {
+                name: variant_name,
+                fields,
+            });
 
             // Check for more variants
             if !self.match_token(&Token::Pipe) {

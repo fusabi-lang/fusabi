@@ -204,6 +204,22 @@ Applies a function to each element of the list
 
 ---
 
+### `List.mapi`
+
+**Type signature:** `(int -> 'a -> 'b) -> 'a list -> 'b list`
+
+Maps with index - needs VM for callback execution
+
+---
+
+### `List.nth`
+
+**Type signature:** `int -> 'a list -> 'a option`
+
+Returns the element at the given index, or None if out of bounds
+
+---
+
 ### `List.reverse`
 
 **Type signature:** `'a list -> 'a list`
@@ -980,7 +996,7 @@ Emit an event with data, calling all registered handlers. Handlers are called sy
 
 ### `Events.emitAsync`
 
-**Type signature:** `string -> 'a -> Async<unit>`
+**Type signature:** `string -> 'a -> Async\<unit\>`
 
 Emit an event asynchronously. Returns immediately while handlers run. Note: In current implementation, this is synchronous but designed for future async support. Example:   Events.emitAsync "Bell" ()
 

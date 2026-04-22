@@ -4,7 +4,7 @@
 
 use crate::error::{ProviderError, ProviderResult};
 use crate::generator::GeneratedTypes;
-use crate::provider::{TypeProvider, ProviderParams};
+use crate::provider::{ProviderParams, TypeProvider};
 use std::collections::HashMap;
 use std::sync::Arc;
 
@@ -38,7 +38,9 @@ impl ProviderRegistry {
         namespace: &str,
         params: &ProviderParams,
     ) -> ProviderResult<GeneratedTypes> {
-        let provider = self.providers.get(provider_name)
+        let provider = self
+            .providers
+            .get(provider_name)
             .ok_or_else(|| ProviderError::UnknownProvider(provider_name.to_string()))?;
 
         // Resolve and generate

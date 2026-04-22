@@ -130,6 +130,37 @@ jobs:
       - name: Run frontend tests
         run: just test-frontend
 
+  # Native aarch64 Linux smoke test. Does not run the full just test-*
+  # matrix (that needs nushell + just on aarch64, which can come later);
+  # this is a build-and-test guard so the aarch64 release builds don't
+  # start failing silently for DGX Spark consumers.
+  test-aarch64:
+    name: Test Suite (aarch64-unknown-linux-gnu)
+    needs: check
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Setup Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: rust
+          key: ubuntu-24.04-arm-stable
+
+      - name: Build workspace
+        run: |
+          cd rust
+          cargo build --workspace
+
+      - name: Run tests
+        run: |
+          cd rust
+          cargo test --workspace
+
   # Build release binaries to ensure release mode works
   build-release:
     name: Release Build
@@ -338,7 +369,7 @@ jobs:
   # All checks passed
   ci-success:
     name: CI Success
-    needs: [check, msrv-check, test, build-release, coverage, security-audit, docs, docs-freshness]
+    needs: [check, msrv-check, test, test-aarch64, build-release, coverage, security-audit, docs, docs-freshness]
     runs-on: ubuntu-latest
     steps:
       - name: Mark CI as successful

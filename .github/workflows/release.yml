@@ -60,7 +60,10 @@ jobs:
             target: x86_64-unknown-linux-gnu
             artifact_name: fus
             asset_name: fusabi-linux-x86_64
-          - os: ubuntu-latest
+          # Native aarch64 Linux runner (GA on GitHub-hosted runners).
+          # Preferred over QEMU / gcc-aarch64 cross: faster and correct
+          # for any native deps we pick up over time.
+          - os: ubuntu-24.04-arm
             target: aarch64-unknown-linux-gnu
             artifact_name: fus
             asset_name: fusabi-linux-aarch64
@@ -87,18 +90,10 @@ jobs:
         with:
           targets: ${{ matrix.target }}
 
-      - name: Install cross-compilation tools (Linux ARM64)
-        if: matrix.target == 'aarch64-unknown-linux-gnu'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y gcc-aarch64-linux-gnu
-
       - name: Build release binary
         run: |
           cd rust
           cargo build --release --target ${{ matrix.target }} -p fusabi
-        env:
-          CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER: aarch64-linux-gnu-gcc
 
       - name: Strip binary (Unix)
         if: runner.os != 'Windows'

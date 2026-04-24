@@ -15,7 +15,7 @@ docs/workstreams/phase-1-mvp/
 ├── 002-lexer-tokenizer.md        # Lexer implementation
 ├── 003-parser.md                 # Parser implementation
 ├── 004-value-representation.md   # VM value types
-├── 005-bytecode-instructions.md  # Bytecode and chunks
+├── 005-bytecode-ops.md           # Bytecode and chunks
 ├── 006-vm-interpreter.md         # VM execution loop
 ├── 007-bytecode-compiler.md      # AST to bytecode
 ├── 008-demo-host.md              # Demo integration

@@ -40,7 +40,7 @@ fn test_engine_can_be_shared_across_threads() {
         // Engine should be usable in another thread
         let eng = engine_clone.lock().unwrap();
         // Check that stdlib functions are registered
-        assert!(eng.host_function_names().len() > 0);
+        assert!(!eng.host_function_names().is_empty());
     });
 
     handle.join().unwrap();

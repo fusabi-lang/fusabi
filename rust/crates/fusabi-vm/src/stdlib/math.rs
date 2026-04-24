@@ -187,7 +187,7 @@ pub fn math_asin(x: &Value) -> Result<Value, VmError> {
         }
     };
 
-    if f < -1.0 || f > 1.0 {
+    if !(-1.0..=1.0).contains(&f) {
         return Err(VmError::Runtime(
             "asin argument must be in range [-1, 1]".to_string(),
         ));
@@ -210,7 +210,7 @@ pub fn math_acos(x: &Value) -> Result<Value, VmError> {
         }
     };
 
-    if f < -1.0 || f > 1.0 {
+    if !(-1.0..=1.0).contains(&f) {
         return Err(VmError::Runtime(
             "acos argument must be in range [-1, 1]".to_string(),
         ));
@@ -384,6 +384,7 @@ pub fn math_truncate(x: &Value) -> Result<Value, VmError> {
 // ============================================================================
 
 #[cfg(test)]
+#[allow(clippy::approx_constant)]
 mod tests {
     use super::*;
 

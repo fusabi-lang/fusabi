@@ -793,7 +793,7 @@ impl TypeInference {
                     };
 
                     // For each extra field, compute suggestions
-                    for extra_field in &validation_result.extra_fields {
+                    if let Some(extra_field) = validation_result.extra_fields.first() {
                         let suggestions =
                             Self::compute_field_suggestions(extra_field, &expected_fields);
                         return Err(TypeError::new(TypeErrorKind::ExtraField {
@@ -883,11 +883,11 @@ impl TypeInference {
 
         let mut matrix = vec![vec![0; len2 + 1]; len1 + 1];
 
-        for i in 0..=len1 {
-            matrix[i][0] = i;
+        for (i, row) in matrix.iter_mut().enumerate().take(len1 + 1) {
+            row[0] = i;
         }
-        for j in 0..=len2 {
-            matrix[0][j] = j;
+        for (j, cell) in matrix[0].iter_mut().enumerate().take(len2 + 1) {
+            *cell = j;
         }
 
         let s1_chars: Vec<char> = s1.chars().collect();

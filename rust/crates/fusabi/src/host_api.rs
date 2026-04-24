@@ -812,7 +812,7 @@ mod tests {
         // Test that undefined module functions produce proper error
         let mut engine = FusabiEngine::new();
 
-        let module = Module::new("test").register_fn1("exists", |x| Ok(x));
+        let module = Module::new("test").register_fn1("exists", Ok);
         engine.register_module(module);
 
         // Try to call a non-existent function

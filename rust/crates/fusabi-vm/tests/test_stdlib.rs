@@ -1,6 +1,8 @@
 // Fusabi Standard Library Integration Tests
 // Tests stdlib functions through the VM
 
+#![allow(clippy::approx_constant)]
+
 use fusabi_vm::stdlib::list::*;
 use fusabi_vm::stdlib::option::*;
 use fusabi_vm::stdlib::register_stdlib;

@@ -234,7 +234,7 @@ optional = true
         match detailed_dep {
             Dependency::Detailed(d) => {
                 assert_eq!(d.version, Some("2.0.0".to_string()));
-                assert_eq!(d.optional, true);
+                assert!(d.optional);
             }
             _ => panic!("Expected detailed dependency"),
         }

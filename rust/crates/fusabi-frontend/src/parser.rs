@@ -1161,6 +1161,7 @@ impl Parser {
     }
 
     /// Extract the leftmost expression and all arguments from a chain of App nodes.
+    #[allow(dead_code)]
     fn extract_app_chain(&self, expr: Expr) -> (Expr, Vec<Expr>) {
         match expr {
             Expr::App { func, arg } => {

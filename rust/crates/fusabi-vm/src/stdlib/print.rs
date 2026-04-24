@@ -19,6 +19,7 @@ pub fn printfn_value(value: &Value) -> Result<Value, VmError> {
 }
 
 #[cfg(test)]
+#[allow(clippy::approx_constant)]
 mod tests {
     use super::*;
 

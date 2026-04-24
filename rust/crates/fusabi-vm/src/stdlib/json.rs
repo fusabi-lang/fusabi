@@ -158,6 +158,7 @@ pub fn json_stringify_pretty(arg: &Value) -> Result<Value, VmError> {
 
 #[cfg(test)]
 #[cfg(feature = "json")]
+#[allow(clippy::approx_constant)]
 mod tests {
     use super::*;
 

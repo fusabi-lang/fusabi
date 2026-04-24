@@ -544,9 +544,9 @@ mod tests {
     #[test]
     fn test_gc_collect_with_roots() {
         let mut heap = GcHeap::new();
-        let id1 = heap.allocate(Value::Int(1));
+        let _id1 = heap.allocate(Value::Int(1));
         let _id2 = heap.allocate(Value::Int(2));
-        let id3 = heap.allocate(Value::Int(3));
+        let _id3 = heap.allocate(Value::Int(3));
 
         // Keep id1 and id3 as roots
         let roots = vec![Value::Int(1), Value::Int(3)];

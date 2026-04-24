@@ -201,7 +201,7 @@ pub fn time_parse(format_str: &Value, time_str: &Value) -> Result<Value, VmError
     match parse_result {
         Ok((year, month, day, hour, minute, second)) => {
             // Validate parsed values
-            if month < 1 || month > 12 {
+            if !(1..=12).contains(&month) {
                 return Ok(create_none());
             }
             if day < 1 || day > days_in_month(month, is_leap_year(year as i64)) {

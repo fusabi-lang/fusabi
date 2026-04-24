@@ -149,7 +149,7 @@ pub fn close_pane(pane_id: &Value) -> Result<Value, VmError> {
                     .lock()
                     .unwrap()
                     .as_ref()
-                    .map_or(false, |p| p.close_pane(*id))
+                    .is_some_and(|p| p.close_pane(*id))
             } else {
                 false
             };
@@ -173,7 +173,7 @@ pub fn focus_pane(pane_id: &Value) -> Result<Value, VmError> {
                     .lock()
                     .unwrap()
                     .as_ref()
-                    .map_or(false, |p| p.focus_pane(*id))
+                    .is_some_and(|p| p.focus_pane(*id))
             } else {
                 false
             };
@@ -217,7 +217,7 @@ pub fn close_tab(tab_id: &Value) -> Result<Value, VmError> {
                     .lock()
                     .unwrap()
                     .as_ref()
-                    .map_or(false, |p| p.close_tab(*id))
+                    .is_some_and(|p| p.close_tab(*id))
             } else {
                 false
             };
@@ -241,7 +241,7 @@ pub fn set_tab_title(tab_id: &Value, title: &Value) -> Result<Value, VmError> {
                     .lock()
                     .unwrap()
                     .as_ref()
-                    .map_or(false, |p| p.set_tab_title(*id, t))
+                    .is_some_and(|p| p.set_tab_title(*id, t))
             } else {
                 false
             };

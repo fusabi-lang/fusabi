@@ -180,6 +180,7 @@ struct Local {
 #[derive(Debug, Clone)]
 struct LoopState {
     /// Offset of the loop start (for continue)
+    #[allow(dead_code)]
     start_offset: usize,
     /// Offsets of break jumps to be patched to loop end
     break_jumps: Vec<usize>,

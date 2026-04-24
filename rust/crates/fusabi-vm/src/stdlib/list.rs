@@ -235,7 +235,7 @@ pub fn list_filter(vm: &mut Vm, args: &[Value]) -> Result<Value, VmError> {
     let mut filtered_elements = Vec::new();
 
     for elem in elements {
-        let result = vm.call_value(func.clone(), &[elem.clone()])?;
+        let result = vm.call_value(func.clone(), std::slice::from_ref(&elem))?;
         match result {
             Value::Bool(true) => filtered_elements.push(elem),
             Value::Bool(false) => {}
@@ -357,7 +357,7 @@ pub fn list_find(vm: &mut Vm, args: &[Value]) -> Result<Value, VmError> {
         .ok_or(VmError::Runtime("Malformed list".into()))?;
 
     for elem in elements {
-        let result = vm.call_value(func.clone(), &[elem.clone()])?;
+        let result = vm.call_value(func.clone(), std::slice::from_ref(&elem))?;
         match result {
             Value::Bool(true) => return Ok(elem),
             Value::Bool(false) => {}
@@ -401,7 +401,7 @@ pub fn list_try_find(vm: &mut Vm, args: &[Value]) -> Result<Value, VmError> {
         .ok_or(VmError::Runtime("Malformed list".into()))?;
 
     for elem in elements {
-        let result = vm.call_value(func.clone(), &[elem.clone()])?;
+        let result = vm.call_value(func.clone(), std::slice::from_ref(&elem))?;
         match result {
             Value::Bool(true) => {
                 return Ok(Value::Variant {
@@ -527,7 +527,7 @@ pub fn list_mapi(vm: &mut Vm, args: &[Value]) -> Result<Value, VmError> {
         // 2. Call the partial with elem to get the result
         let index_val = Value::Int(index as i64);
         let partial = vm.call_value(func.clone(), &[index_val])?;
-        let result = vm.call_value(partial, &[elem.clone()])?;
+        let result = vm.call_value(partial, std::slice::from_ref(elem))?;
         mapped_elements.push(result);
     }
 

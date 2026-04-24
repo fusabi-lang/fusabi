@@ -73,7 +73,7 @@ fn test_while_loop_returns_unit() {
             Instruction::LoadConst(idx) => Some(*idx),
             _ => None,
         })
-        .last();
+        .next_back();
 
     if let Some(idx) = last_load_const {
         // Should be loading unit
@@ -160,7 +160,7 @@ fn test_break_in_nested_loop() {
     let chunk = compile_source(source).unwrap();
 
     // Compilation should succeed
-    assert!(chunk.instructions.len() > 0);
+    assert!(!chunk.instructions.is_empty());
 }
 
 #[test]
@@ -170,7 +170,7 @@ fn test_continue_in_nested_loop() {
     let chunk = compile_source(source).unwrap();
 
     // Compilation should succeed
-    assert!(chunk.instructions.len() > 0);
+    assert!(!chunk.instructions.is_empty());
 }
 
 #[test]

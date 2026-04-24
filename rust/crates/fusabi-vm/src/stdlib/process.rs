@@ -154,7 +154,7 @@ fn list_to_string_vec(list: &Value) -> Result<Vec<String>, VmError> {
         match current {
             Value::Nil => break,
             Value::Cons { head, tail } => {
-                let arg_str = head.as_str().ok_or_else(|| VmError::TypeMismatch {
+                let arg_str = head.as_str().ok_or(VmError::TypeMismatch {
                     expected: "string list",
                     got: "list with non-string elements",
                 })?;

@@ -22,6 +22,7 @@ pub enum KeymapStyle {
 }
 
 impl KeymapStyle {
+    #[allow(clippy::should_implement_trait)]
     pub fn from_str(s: &str) -> Self {
         match s.to_lowercase().as_str() {
             "vimium" => KeymapStyle::Vimium,
@@ -31,6 +32,7 @@ impl KeymapStyle {
         }
     }
 
+    #[allow(clippy::inherent_to_string)]
     pub fn to_string(&self) -> String {
         match self {
             KeymapStyle::Vimium => "vimium".to_string(),

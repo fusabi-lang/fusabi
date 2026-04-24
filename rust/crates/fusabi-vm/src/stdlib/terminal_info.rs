@@ -70,9 +70,11 @@ pub trait TerminalInfoProvider: Send + Sync {
 }
 
 /// Global provider registry using OnceLock for thread-safe initialization
+#[allow(clippy::type_complexity)]
 static PROVIDER: OnceLock<Arc<Mutex<Option<Box<dyn TerminalInfoProvider>>>>> = OnceLock::new();
 
 /// Initialize the provider storage
+#[allow(clippy::type_complexity)]
 fn get_provider_storage() -> &'static Arc<Mutex<Option<Box<dyn TerminalInfoProvider>>>> {
     PROVIDER.get_or_init(|| Arc::new(Mutex::new(None)))
 }
@@ -218,8 +220,7 @@ pub fn get_lines(start: &Value, end: &Value) -> Result<Value, VmError> {
 pub fn get_window_title(unit: &Value) -> Result<Value, VmError> {
     match unit {
         Value::Unit => {
-            let title = with_provider(|provider| provider.get_window_title())
-                .unwrap_or_else(|| String::new());
+            let title = with_provider(|provider| provider.get_window_title()).unwrap_or_default();
 
             Ok(Value::Str(title))
         }
@@ -235,8 +236,7 @@ pub fn get_window_title(unit: &Value) -> Result<Value, VmError> {
 pub fn get_tab_title(unit: &Value) -> Result<Value, VmError> {
     match unit {
         Value::Unit => {
-            let title =
-                with_provider(|provider| provider.get_tab_title()).unwrap_or_else(|| String::new());
+            let title = with_provider(|provider| provider.get_tab_title()).unwrap_or_default();
 
             Ok(Value::Str(title))
         }

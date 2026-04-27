@@ -95,48 +95,48 @@ impl SemVer {
             return true;
         }
 
-        if constraint.starts_with('^') {
-            if let Ok(base) = SemVer::parse(&constraint[1..]) {
+        if let Some(rest) = constraint.strip_prefix('^') {
+            if let Ok(base) = SemVer::parse(rest) {
                 return self.major == base.major
                     && (self.minor > base.minor
                         || (self.minor == base.minor && self.patch >= base.patch));
             }
         }
 
-        if constraint.starts_with('~') {
-            if let Ok(base) = SemVer::parse(&constraint[1..]) {
+        if let Some(rest) = constraint.strip_prefix('~') {
+            if let Ok(base) = SemVer::parse(rest) {
                 return self.major == base.major
                     && self.minor == base.minor
                     && self.patch >= base.patch;
             }
         }
 
-        if constraint.starts_with(">=") {
-            if let Ok(base) = SemVer::parse(&constraint[2..]) {
+        if let Some(rest) = constraint.strip_prefix(">=") {
+            if let Ok(base) = SemVer::parse(rest) {
                 return *self >= base;
             }
         }
 
-        if constraint.starts_with('>') {
-            if let Ok(base) = SemVer::parse(&constraint[1..]) {
+        if let Some(rest) = constraint.strip_prefix('>') {
+            if let Ok(base) = SemVer::parse(rest) {
                 return *self > base;
             }
         }
 
-        if constraint.starts_with("<=") {
-            if let Ok(base) = SemVer::parse(&constraint[2..]) {
+        if let Some(rest) = constraint.strip_prefix("<=") {
+            if let Ok(base) = SemVer::parse(rest) {
                 return *self <= base;
             }
         }
 
-        if constraint.starts_with('<') {
-            if let Ok(base) = SemVer::parse(&constraint[1..]) {
+        if let Some(rest) = constraint.strip_prefix('<') {
+            if let Ok(base) = SemVer::parse(rest) {
                 return *self < base;
             }
         }
 
-        if constraint.starts_with('=') {
-            if let Ok(base) = SemVer::parse(&constraint[1..]) {
+        if let Some(rest) = constraint.strip_prefix('=') {
+            if let Ok(base) = SemVer::parse(rest) {
                 return *self == base;
             }
         }

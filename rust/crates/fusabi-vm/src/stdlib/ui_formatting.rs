@@ -296,8 +296,8 @@ pub fn invoke_tab_formatters(vm: &mut Vm, tab_info: Value) -> Result<Vec<Vec<Val
     let mut results = Vec::new();
 
     if let Some(ref fmt) = *formatters {
-        for (_id, formatter) in &fmt.tab_formatters {
-            let result = vm.call_value(formatter.clone(), &[tab_info.clone()])?;
+        for formatter in fmt.tab_formatters.values() {
+            let result = vm.call_value(formatter.clone(), std::slice::from_ref(&tab_info))?;
 
             // Convert result (list) to vector
             let segments = match &result {
@@ -330,8 +330,8 @@ pub fn invoke_status_left_formatters(
     let mut results = Vec::new();
 
     if let Some(ref fmt) = *formatters {
-        for (_id, formatter) in &fmt.status_left_formatters {
-            let result = vm.call_value(formatter.clone(), &[status_info.clone()])?;
+        for formatter in fmt.status_left_formatters.values() {
+            let result = vm.call_value(formatter.clone(), std::slice::from_ref(&status_info))?;
 
             // Convert result (list) to vector
             let segments = match &result {
@@ -364,8 +364,8 @@ pub fn invoke_status_right_formatters(
     let mut results = Vec::new();
 
     if let Some(ref fmt) = *formatters {
-        for (_id, formatter) in &fmt.status_right_formatters {
-            let result = vm.call_value(formatter.clone(), &[status_info.clone()])?;
+        for formatter in fmt.status_right_formatters.values() {
+            let result = vm.call_value(formatter.clone(), std::slice::from_ref(&status_info))?;
 
             // Convert result (list) to vector
             let segments = match &result {
@@ -401,7 +401,7 @@ mod tests {
         // Create a mock closure
         let closure = Value::Closure(Arc::new(Closure::with_arity(Chunk::new(), 1)));
 
-        let result = on_format_tab(&mut vm, &[closure.clone()]);
+        let result = on_format_tab(&mut vm, std::slice::from_ref(&closure));
         assert!(result.is_ok());
 
         // Verify we got an integer handler ID
@@ -471,8 +471,8 @@ mod tests {
         let closure = Value::Closure(Arc::new(Closure::with_arity(Chunk::new(), 1)));
 
         // Register multiple formatters
-        on_format_tab(&mut vm, &[closure.clone()]).unwrap();
-        on_format_status_left(&mut vm, &[closure.clone()]).unwrap();
+        on_format_tab(&mut vm, std::slice::from_ref(&closure)).unwrap();
+        on_format_status_left(&mut vm, std::slice::from_ref(&closure)).unwrap();
         on_format_status_right(&mut vm, &[closure]).unwrap();
 
         // Clear all
@@ -552,7 +552,7 @@ mod tests {
         assert_eq!(text, "Hello");
         assert_eq!(fg_color, Some("red".to_string()));
         assert_eq!(bg_color, None);
-        assert_eq!(bold, true);
+        assert!(bold);
     }
 
     #[test]
@@ -592,12 +592,12 @@ mod tests {
         let mut vm = Vm::new();
         let closure = Value::Closure(Arc::new(Closure::with_arity(Chunk::new(), 1)));
 
-        let id1 = match on_format_tab(&mut vm, &[closure.clone()]).unwrap() {
+        let id1 = match on_format_tab(&mut vm, std::slice::from_ref(&closure)).unwrap() {
             Value::Int(id) => id,
             _ => panic!("Expected Int"),
         };
 
-        let id2 = match on_format_tab(&mut vm, &[closure.clone()]).unwrap() {
+        let id2 = match on_format_tab(&mut vm, std::slice::from_ref(&closure)).unwrap() {
             Value::Int(id) => id,
             _ => panic!("Expected Int"),
         };

@@ -74,7 +74,7 @@ pub fn async_return_from(_vm: &mut Vm, args: &[Value]) -> Result<Value, VmError>
     Ok(args[0].clone())
 }
 
-/// Async.Zero : unit -> Async<unit>
+/// Async.Zero : unit -> `Async<unit>`
 pub fn async_zero(_vm: &mut Vm, _args: &[Value]) -> Result<Value, VmError> {
     Ok(Value::Variant {
         type_name: "Async".to_string(),
@@ -83,7 +83,7 @@ pub fn async_zero(_vm: &mut Vm, _args: &[Value]) -> Result<Value, VmError> {
     })
 }
 
-/// Async.Combine : Async<unit> -> Async<'a> -> Async<'a>
+/// Async.Combine : `Async<unit>` -> Async<'a> -> Async<'a>
 pub fn async_combine(_vm: &mut Vm, args: &[Value]) -> Result<Value, VmError> {
     if args.len() != 2 {
         return Err(VmError::Runtime(
@@ -202,9 +202,9 @@ pub mod tokio_async {
                 )));
             }
 
-            let millis = args[0].as_int().ok_or_else(|| {
-                VmError::Runtime("Async.sleep expects int argument".to_string())
-            })?;
+            let millis = args[0]
+                .as_int()
+                .ok_or_else(|| VmError::Runtime("Async.sleep expects int argument".to_string()))?;
 
             let task_id = vm.exec_async(move || {
                 std::thread::sleep(std::time::Duration::from_millis(millis as u64));
@@ -334,19 +334,17 @@ pub mod tokio_async {
             };
 
             let runtime_clone = vm.async_runtime.as_ref().unwrap().clone();
-            let catch_task_id = vm.exec_async(move || {
-                match runtime_clone.block_on(task_id) {
-                    Ok(v) => Ok(Value::Variant {
-                        type_name: "Result".to_string(),
-                        variant_name: "Ok".to_string(),
-                        fields: vec![v],
-                    }),
-                    Err(e) => Ok(Value::Variant {
-                        type_name: "Result".to_string(),
-                        variant_name: "Error".to_string(),
-                        fields: vec![Value::Str(format!("{}", e))],
-                    }),
-                }
+            let catch_task_id = vm.exec_async(move || match runtime_clone.block_on(task_id) {
+                Ok(v) => Ok(Value::Variant {
+                    type_name: "Result".to_string(),
+                    variant_name: "Ok".to_string(),
+                    fields: vec![v],
+                }),
+                Err(e) => Ok(Value::Variant {
+                    type_name: "Result".to_string(),
+                    variant_name: "Error".to_string(),
+                    fields: vec![Value::Str(format!("{}", e))],
+                }),
             })?;
 
             Ok(Value::Async(AsyncValue::Task(catch_task_id)))

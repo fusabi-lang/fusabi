@@ -120,7 +120,7 @@ pub fn osc_client(_vm: &mut crate::vm::Vm, args: &[Value]) -> Result<Value, VmEr
 }
 
 #[cfg(feature = "osc")]
-/// Osc.send : OscClient -> string -> list<obj> -> unit
+/// Osc.send : OscClient -> string -> `list<obj>` -> unit
 /// Send an OSC message with arguments to the specified address
 /// Example: client |> Osc.send "/transport_play" [1; "test"]
 pub fn osc_send(_vm: &mut crate::vm::Vm, args: &[Value]) -> Result<Value, VmError> {
@@ -186,7 +186,7 @@ pub fn osc_send(_vm: &mut crate::vm::Vm, args: &[Value]) -> Result<Value, VmErro
 #[cfg(feature = "osc")]
 /// Osc.sendInt : OscClient -> string -> int -> unit
 /// Deprecated: Use Osc.send instead
-pub fn osc_send_int(_vm: &mut crate::vm::Vm, args: &[Value]) -> Result<Value, VmError> {
+pub fn osc_send_int(_vm: &mut crate::vm::Vm, _args: &[Value]) -> Result<Value, VmError> {
     // Implementation kept for reference but not registered
     Err(VmError::Runtime(
         "Osc.sendInt is deprecated, use Osc.send".to_string(),
@@ -196,7 +196,7 @@ pub fn osc_send_int(_vm: &mut crate::vm::Vm, args: &[Value]) -> Result<Value, Vm
 #[cfg(feature = "osc")]
 /// Osc.sendFloat : OscClient -> string -> float -> unit
 /// Deprecated: Use Osc.send instead
-pub fn osc_send_float(_vm: &mut crate::vm::Vm, args: &[Value]) -> Result<Value, VmError> {
+pub fn osc_send_float(_vm: &mut crate::vm::Vm, _args: &[Value]) -> Result<Value, VmError> {
     // Implementation kept for reference but not registered
     Err(VmError::Runtime(
         "Osc.sendFloat is deprecated, use Osc.send".to_string(),
@@ -206,7 +206,7 @@ pub fn osc_send_float(_vm: &mut crate::vm::Vm, args: &[Value]) -> Result<Value, 
 #[cfg(feature = "osc")]
 /// Osc.sendString : OscClient -> string -> string -> unit
 /// Deprecated: Use Osc.send instead
-pub fn osc_send_string(_vm: &mut crate::vm::Vm, args: &[Value]) -> Result<Value, VmError> {
+pub fn osc_send_string(_vm: &mut crate::vm::Vm, _args: &[Value]) -> Result<Value, VmError> {
     // Implementation kept for reference but not registered
     Err(VmError::Runtime(
         "Osc.sendString is deprecated, use Osc.send".to_string(),

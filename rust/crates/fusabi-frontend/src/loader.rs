@@ -158,10 +158,7 @@ impl FileLoader {
             PathBuf::from(path)
         } else {
             // Relative to from_file's directory
-            from_file
-                .parent()
-                .unwrap_or(&self.base_dir)
-                .join(path)
+            from_file.parent().unwrap_or(&self.base_dir).join(path)
         };
 
         // Canonicalize to get absolute path and resolve symlinks

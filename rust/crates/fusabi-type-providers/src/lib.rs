@@ -28,16 +28,16 @@
 //! ```
 
 pub mod error;
-pub mod types;
 pub mod generator;
 pub mod provider;
 pub mod registry;
+pub mod types;
 
 // Re-export main types for convenience
 pub use error::{ProviderError, ProviderResult};
-pub use types::{
-    TypeDefinition, RecordDef, DuDef, VariantDef, FieldDef, TypeExpr, FieldValidationResult,
-};
-pub use generator::{GeneratedTypes, GeneratedModule, TypeGenerator, NamingStrategy};
-pub use provider::{TypeProvider, ProviderParams, Schema};
+pub use generator::{GeneratedModule, GeneratedTypes, NamingStrategy, TypeGenerator};
+pub use provider::{ProviderParams, Schema, TypeProvider};
 pub use registry::ProviderRegistry;
+pub use types::{
+    DuDef, FieldDef, FieldValidationResult, RecordDef, TypeDefinition, TypeExpr, VariantDef,
+};

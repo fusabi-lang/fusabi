@@ -69,7 +69,7 @@ pub fn events_on(_vm: &mut Vm, args: &[Value]) -> Result<Value, VmError> {
         let mut registry = EVENT_HANDLERS.lock().unwrap();
         registry
             .entry(event_name)
-            .or_insert_with(Vec::new)
+            .or_default()
             .push((handler_id, handler));
     }
 
@@ -144,13 +144,13 @@ pub fn events_emit(vm: &mut Vm, args: &[Value]) -> Result<Value, VmError> {
 
     // Call each handler with the event data
     for handler in handlers {
-        vm.call_value(handler, &[event_data.clone()])?;
+        vm.call_value(handler, std::slice::from_ref(&event_data))?;
     }
 
     Ok(Value::Unit)
 }
 
-/// Events.emitAsync : string -> 'a -> Async<unit>
+/// Events.emitAsync : string -> 'a -> Async\<unit\>
 /// Emit an event asynchronously. Returns immediately while handlers run.
 /// Note: In current implementation, this is synchronous but designed for future async support.
 ///
@@ -207,7 +207,7 @@ pub fn events_once(_vm: &mut Vm, args: &[Value]) -> Result<Value, VmError> {
         let mut registry = EVENT_HANDLERS.lock().unwrap();
         registry
             .entry(format!("__once__{}", event_name))
-            .or_insert_with(Vec::new)
+            .or_default()
             .push((handler_id, handler));
     }
 
@@ -325,8 +325,8 @@ pub fn emit_event_internal(vm: &mut Vm, event_name: &str, data: Value) -> Result
     };
 
     // Call all handlers
-    for handler in handlers.into_iter().chain(once_handlers.into_iter()) {
-        vm.call_value(handler, &[data.clone()])?;
+    for handler in handlers.into_iter().chain(once_handlers) {
+        vm.call_value(handler, std::slice::from_ref(&data))?;
     }
 
     Ok(())

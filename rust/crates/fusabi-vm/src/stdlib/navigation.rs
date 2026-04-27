@@ -22,6 +22,7 @@ pub enum KeymapStyle {
 }
 
 impl KeymapStyle {
+    #[allow(clippy::should_implement_trait)]
     pub fn from_str(s: &str) -> Self {
         match s.to_lowercase().as_str() {
             "vimium" => KeymapStyle::Vimium,
@@ -31,6 +32,7 @@ impl KeymapStyle {
         }
     }
 
+    #[allow(clippy::inherent_to_string)]
     pub fn to_string(&self) -> String {
         match self {
             KeymapStyle::Vimium => "vimium".to_string(),
@@ -347,7 +349,7 @@ pub fn nav_jump_to_anchor(_vm: &mut crate::vm::Vm, args: &[Value]) -> Result<Val
     })
 }
 
-/// Nav.getCurrentAnchor() -> Option<string>
+/// Nav.getCurrentAnchor() -> `Option<string>`
 /// Returns the current anchor/focusable id if any
 pub fn nav_get_current_anchor(_vm: &mut crate::vm::Vm, _args: &[Value]) -> Result<Value, VmError> {
     let state = NAV_STATE

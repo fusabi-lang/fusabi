@@ -196,7 +196,7 @@ pub fn map_to_list(map: &Value) -> Result<Value, VmError> {
             entries.sort_by(|a, b| {
                 if let (Value::Tuple(a_tuple), Value::Tuple(b_tuple)) = (a, b) {
                     if let (Some(Value::Str(a_key)), Some(Value::Str(b_key))) =
-                        (a_tuple.get(0), b_tuple.get(0))
+                        (a_tuple.first(), b_tuple.first())
                     {
                         return a_key.cmp(b_key);
                     }
@@ -231,7 +231,7 @@ pub fn map_map(vm: &mut Vm, args: &[Value]) -> Result<Value, VmError> {
             let mut new_map = HashMap::new();
 
             for (key, value) in m.iter() {
-                let transformed_value = vm.call_value(func.clone(), &[value.clone()])?;
+                let transformed_value = vm.call_value(func.clone(), std::slice::from_ref(value))?;
                 new_map.insert(key.clone(), transformed_value);
             }
 
@@ -269,7 +269,7 @@ pub fn map_iter(vm: &mut Vm, args: &[Value]) -> Result<Value, VmError> {
                 if let Some(value) = m.get(&key) {
                     // Curried function: func key value => (func key) value
                     let partial = vm.call_value(func.clone(), &[Value::Str(key)])?;
-                    vm.call_value(partial, &[value.clone()])?;
+                    vm.call_value(partial, std::slice::from_ref(value))?;
                 }
             }
 

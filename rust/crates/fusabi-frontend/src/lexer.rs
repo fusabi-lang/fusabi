@@ -743,7 +743,7 @@ impl Lexer {
                 // Expect a string literal for the path
                 if self.is_at_end() || self.current_char() != '"' {
                     return Err(LexError::UnknownDirective(
-                        format!("#load requires a string path"),
+                        "#load requires a string path".to_string(),
                         start_pos,
                     ));
                 }
@@ -752,7 +752,7 @@ impl Lexer {
                     Ok(Token::LoadDirective(path))
                 } else {
                     Err(LexError::UnknownDirective(
-                        format!("#load requires a string path"),
+                        "#load requires a string path".to_string(),
                         start_pos,
                     ))
                 }

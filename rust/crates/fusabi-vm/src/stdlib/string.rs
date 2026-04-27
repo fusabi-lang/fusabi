@@ -341,6 +341,7 @@ pub fn string_format(format_str: &Value, args: &Value) -> Result<Value, VmError>
 }
 
 #[cfg(test)]
+#[allow(clippy::approx_constant)]
 mod tests {
     use super::*;
 

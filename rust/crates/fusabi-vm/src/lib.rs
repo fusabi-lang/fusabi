@@ -15,9 +15,9 @@ pub mod vm;
 
 // Async modules (feature-gated)
 #[cfg(feature = "async")]
-pub mod async_types;
-#[cfg(feature = "async")]
 pub mod async_runtime;
+#[cfg(feature = "async")]
+pub mod async_types;
 
 pub use chunk::{Chunk, ChunkBuilder, SourceSpan};
 pub use closure::{Closure, Upvalue};

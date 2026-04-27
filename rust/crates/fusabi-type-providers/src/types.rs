@@ -204,8 +204,11 @@ impl TypeDefinition {
     pub fn validate_fields(&self, provided_fields: &[String]) -> FieldValidationResult {
         match self {
             TypeDefinition::Record(record) => {
-                let expected_fields: std::collections::HashSet<&str> =
-                    record.fields.iter().map(|(name, _)| name.as_str()).collect();
+                let expected_fields: std::collections::HashSet<&str> = record
+                    .fields
+                    .iter()
+                    .map(|(name, _)| name.as_str())
+                    .collect();
                 let provided_set: std::collections::HashSet<&str> =
                     provided_fields.iter().map(|s| s.as_str()).collect();
 

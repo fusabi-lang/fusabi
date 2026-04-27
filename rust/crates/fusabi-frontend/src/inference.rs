@@ -726,19 +726,17 @@ impl TypeInference {
             }
         } else {
             // Try to find in any module (search all modules)
-            registry
-                .module_names()
-                .iter()
-                .find_map(|module_name| {
-                    registry
-                        .get_module_types(module_name)
-                        .and_then(|types| types.get(type_name))
-                })
+            registry.module_names().iter().find_map(|module_name| {
+                registry
+                    .get_module_types(module_name)
+                    .and_then(|types| types.get(type_name))
+            })
         };
 
         if let Some(type_def) = type_def {
             // Use the type provider's field validation
-            let provided_fields: Vec<String> = fields.iter().map(|(name, _)| name.clone()).collect();
+            let provided_fields: Vec<String> =
+                fields.iter().map(|(name, _)| name.clone()).collect();
 
             // Convert AST TypeDefinition to type provider TypeDefinition and validate
             let validation_result = match type_def {
@@ -757,7 +755,8 @@ impl TypeInference {
                         fields: provider_fields,
                     };
 
-                    let provider_type_def = fusabi_type_providers::TypeDefinition::Record(provider_record);
+                    let provider_type_def =
+                        fusabi_type_providers::TypeDefinition::Record(provider_record);
                     provider_type_def.validate_fields(&provided_fields)
                 }
                 crate::modules::TypeDefinition::Du(_) => {
@@ -785,15 +784,18 @@ impl TypeInference {
                 if !validation_result.extra_fields.is_empty() {
                     // Get expected field names for suggestions
                     let expected_fields = match type_def {
-                        crate::modules::TypeDefinition::Record(record) => {
-                            record.fields.iter().map(|(name, _)| name.clone()).collect::<Vec<_>>()
-                        }
+                        crate::modules::TypeDefinition::Record(record) => record
+                            .fields
+                            .iter()
+                            .map(|(name, _)| name.clone())
+                            .collect::<Vec<_>>(),
                         _ => vec![],
                     };
 
                     // For each extra field, compute suggestions
-                    for extra_field in &validation_result.extra_fields {
-                        let suggestions = Self::compute_field_suggestions(extra_field, &expected_fields);
+                    if let Some(extra_field) = validation_result.extra_fields.first() {
+                        let suggestions =
+                            Self::compute_field_suggestions(extra_field, &expected_fields);
                         return Err(TypeError::new(TypeErrorKind::ExtraField {
                             type_name: type_name.to_string(),
                             field: extra_field.clone(),
@@ -803,7 +805,9 @@ impl TypeInference {
                 }
 
                 // Report missing fields as a TypeProviderFieldMismatch
-                if !validation_result.missing_fields.is_empty() || !validation_result.extra_fields.is_empty() {
+                if !validation_result.missing_fields.is_empty()
+                    || !validation_result.extra_fields.is_empty()
+                {
                     return Err(TypeError::new(TypeErrorKind::TypeProviderFieldMismatch {
                         type_name: type_name.to_string(),
                         extra_fields: validation_result.extra_fields,
@@ -827,7 +831,9 @@ impl TypeInference {
         ty: &crate::ast::TypeExpr,
     ) -> fusabi_type_providers::TypeExpr {
         match ty {
-            crate::ast::TypeExpr::Named(name) => fusabi_type_providers::TypeExpr::Named(name.clone()),
+            crate::ast::TypeExpr::Named(name) => {
+                fusabi_type_providers::TypeExpr::Named(name.clone())
+            }
             crate::ast::TypeExpr::Tuple(types) => fusabi_type_providers::TypeExpr::Tuple(
                 types
                     .iter()
@@ -877,11 +883,11 @@ impl TypeInference {
 
         let mut matrix = vec![vec![0; len2 + 1]; len1 + 1];
 
-        for i in 0..=len1 {
-            matrix[i][0] = i;
+        for (i, row) in matrix.iter_mut().enumerate().take(len1 + 1) {
+            row[0] = i;
         }
-        for j in 0..=len2 {
-            matrix[0][j] = j;
+        for (j, cell) in matrix[0].iter_mut().enumerate().take(len2 + 1) {
+            *cell = j;
         }
 
         let s1_chars: Vec<char> = s1.chars().collect();
@@ -889,7 +895,11 @@ impl TypeInference {
 
         for i in 1..=len1 {
             for j in 1..=len2 {
-                let cost = if s1_chars[i - 1] == s2_chars[j - 1] { 0 } else { 1 };
+                let cost = if s1_chars[i - 1] == s2_chars[j - 1] {
+                    0
+                } else {
+                    1
+                };
                 matrix[i][j] = std::cmp::min(
                     std::cmp::min(matrix[i - 1][j] + 1, matrix[i][j - 1] + 1),
                     matrix[i - 1][j - 1] + cost,
@@ -1516,7 +1526,10 @@ mod tests {
         let expr = Expr::RecordLiteral {
             type_name: "Person".to_string(),
             fields: vec![
-                ("name".to_string(), Box::new(Expr::Lit(Literal::Str("Alice".to_string())))),
+                (
+                    "name".to_string(),
+                    Box::new(Expr::Lit(Literal::Str("Alice".to_string()))),
+                ),
                 ("age".to_string(), Box::new(lit_int(30))),
             ],
         };
@@ -1552,9 +1565,15 @@ mod tests {
         let expr = Expr::RecordLiteral {
             type_name: "Person".to_string(),
             fields: vec![
-                ("name".to_string(), Box::new(Expr::Lit(Literal::Str("Alice".to_string())))),
+                (
+                    "name".to_string(),
+                    Box::new(Expr::Lit(Literal::Str("Alice".to_string()))),
+                ),
                 ("age".to_string(), Box::new(lit_int(30))),
-                ("email".to_string(), Box::new(Expr::Lit(Literal::Str("alice@example.com".to_string())))),
+                (
+                    "email".to_string(),
+                    Box::new(Expr::Lit(Literal::Str("alice@example.com".to_string()))),
+                ),
             ],
         };
 
@@ -1596,7 +1615,10 @@ mod tests {
         let expr = Expr::RecordLiteral {
             type_name: "Person".to_string(),
             fields: vec![
-                ("nam".to_string(), Box::new(Expr::Lit(Literal::Str("Alice".to_string())))),
+                (
+                    "nam".to_string(),
+                    Box::new(Expr::Lit(Literal::Str("Alice".to_string()))),
+                ),
                 ("age".to_string(), Box::new(lit_int(30))),
             ],
         };
@@ -1605,7 +1627,9 @@ mod tests {
         assert!(result.is_err());
 
         match result.unwrap_err().kind {
-            TypeErrorKind::ExtraField { field, suggestions, .. } => {
+            TypeErrorKind::ExtraField {
+                field, suggestions, ..
+            } => {
                 assert_eq!(field, "nam");
                 assert!(suggestions.contains(&"name".to_string()));
             }
@@ -1622,9 +1646,7 @@ mod tests {
         // Record literal with unknown type
         let expr = Expr::RecordLiteral {
             type_name: "UnknownType".to_string(),
-            fields: vec![
-                ("field1".to_string(), Box::new(lit_int(42))),
-            ],
+            fields: vec![("field1".to_string(), Box::new(lit_int(42)))],
         };
 
         let result = inf.infer_and_solve(&expr, &env);
@@ -1650,7 +1672,10 @@ mod tests {
             type_name: String::new(),
             fields: vec![
                 ("field1".to_string(), Box::new(lit_int(42))),
-                ("field2".to_string(), Box::new(Expr::Lit(Literal::Str("hello".to_string())))),
+                (
+                    "field2".to_string(),
+                    Box::new(Expr::Lit(Literal::Str("hello".to_string()))),
+                ),
             ],
         };
 
@@ -1682,7 +1707,9 @@ mod tests {
 
         // Multiple close matches
         let suggestions = TypeInference::compute_field_suggestions("ema", &expected);
-        assert!(suggestions.contains(&"email".to_string()) || suggestions.contains(&"name".to_string()));
+        assert!(
+            suggestions.contains(&"email".to_string()) || suggestions.contains(&"name".to_string())
+        );
 
         // Too far should return empty or distant matches
         let suggestions = TypeInference::compute_field_suggestions("xyz", &expected);

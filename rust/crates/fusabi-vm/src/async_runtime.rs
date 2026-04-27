@@ -74,8 +74,7 @@ impl AsyncRuntime {
                         RuntimeCommand::Spawn { id, task } => {
                             let response_tx = response_tx.clone();
                             let handle = tokio::spawn(async move {
-                                let result = match tokio::task::spawn_blocking(task).await
-                                {
+                                let result = match tokio::task::spawn_blocking(task).await {
                                     Ok(Ok(value)) => AsyncState::Ready(value),
                                     Ok(Err(e)) => AsyncState::Failed(format!("{}", e)),
                                     Err(e) => AsyncState::Failed(format!("Task panicked: {}", e)),
@@ -89,11 +88,10 @@ impl AsyncRuntime {
                         RuntimeCommand::Cancel { id } => {
                             if let Some(handle) = tasks.remove(&id) {
                                 handle.abort();
-                                let _ =
-                                    response_tx.send(RuntimeResponse::Completed {
-                                        id,
-                                        result: AsyncState::Cancelled,
-                                    });
+                                let _ = response_tx.send(RuntimeResponse::Completed {
+                                    id,
+                                    result: AsyncState::Cancelled,
+                                });
                             }
                         }
                         RuntimeCommand::Shutdown => {

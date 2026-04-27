@@ -670,7 +670,9 @@ mod tests {
         let func = engine.eval("String.length").unwrap();
 
         // Apply the native function to a string
-        let result = engine.apply(func, &[Value::Str("hello".to_string())]).unwrap();
+        let result = engine
+            .apply(func, &[Value::Str("hello".to_string())])
+            .unwrap();
         assert_eq!(result, Value::Int(5));
     }
 
@@ -715,9 +717,7 @@ mod tests {
         engine.register_module(db_module);
 
         // Test calling module function via eval()
-        let result = engine
-            .eval(r#"db.append("topic", [1; 2; 3])"#)
-            .unwrap();
+        let result = engine.eval(r#"db.append("topic", [1; 2; 3])"#).unwrap();
         assert_eq!(result.as_int(), Some(42));
 
         // Test calling another module function
@@ -764,13 +764,12 @@ mod tests {
         // Test calling module functions directly (without intermediate binding)
         let mut engine = FusabiEngine::new();
 
-        let str_module = Module::new("str")
-            .register_fn1("upper", |s| {
-                let text = s
-                    .as_str()
-                    .ok_or_else(|| VmError::Runtime("Expected string".into()))?;
-                Ok(Value::Str(text.to_uppercase()))
-            });
+        let str_module = Module::new("str").register_fn1("upper", |s| {
+            let text = s
+                .as_str()
+                .ok_or_else(|| VmError::Runtime("Expected string".into()))?;
+            Ok(Value::Str(text.to_uppercase()))
+        });
 
         engine.register_module(str_module);
 
@@ -802,7 +801,9 @@ mod tests {
         engine.register_module(module_b);
 
         // Both modules should be accessible - use let bindings to make evaluation order explicit
-        let result = engine.eval("let x = a.func(5) in let y = b.func(10) in x + y").unwrap();
+        let result = engine
+            .eval("let x = a.func(5) in let y = b.func(10) in x + y")
+            .unwrap();
         assert_eq!(result.as_int(), Some(35)); // (5 + 10) + (10 * 2) = 15 + 20 = 35
     }
 
@@ -811,7 +812,7 @@ mod tests {
         // Test that undefined module functions produce proper error
         let mut engine = FusabiEngine::new();
 
-        let module = Module::new("test").register_fn1("exists", |x| Ok(x));
+        let module = Module::new("test").register_fn1("exists", Ok);
         engine.register_module(module);
 
         // Try to call a non-existent function

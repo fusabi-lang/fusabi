@@ -83,7 +83,7 @@ fn test_method_dispatch_basic() {
         .insert("counter".to_string(), Value::HostData(host_data));
 
     // Test: counter.increment()
-    let source = "counter.increment()";
+    let _source = "counter.increment()";
     let expr = parse_simple_method_call("counter", "increment", vec![]);
 
     let chunk = Compiler::compile(&expr).unwrap();

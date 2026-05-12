@@ -2,7 +2,7 @@
 name = "fusabi-vm"
 version = "0.35.0"
 edition = "2021"
-rust-version = "1.70.0"
+rust-version = "1.84.0"
 description = "Virtual Machine for Fusabi language"
 license = "MIT"
 

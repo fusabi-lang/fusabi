@@ -57,13 +57,13 @@ jobs:
       - name: Setup Rust MSRV toolchain
         uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: "1.85.0"
+          toolchain: "1.86.0"
 
       - name: Setup Rust cache
         uses: Swatinem/rust-cache@v2
         with:
           workspaces: rust
-          key: msrv-1.85.0
+          key: msrv-1.86.0
 
       - name: Check compilation with MSRV
         run: |

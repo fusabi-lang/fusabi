@@ -2,7 +2,7 @@
 name = "fusabi-lsp"
 version = "0.35.0"
 edition = "2021"
-rust-version = "1.85.0"
+rust-version = "1.86.0"
 description = "Language Server Protocol implementation for Fusabi"
 license = "MIT"
 

@@ -21,11 +21,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Install just
-        shell: bash
-        run: |
-          mkdir -p "$HOME/.local/bin"
-          curl --proto '=https' --tlsv1.2 -sSf https://just.systems/install.sh | bash -s -- --to "$HOME/.local/bin"
-          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+        uses: extractions/setup-just@v3
 
       - name: Setup Rust toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -56,22 +52,18 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Install just
-        shell: bash
-        run: |
-          mkdir -p "$HOME/.local/bin"
-          curl --proto '=https' --tlsv1.2 -sSf https://just.systems/install.sh | bash -s -- --to "$HOME/.local/bin"
-          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+        uses: extractions/setup-just@v3
 
       - name: Setup Rust MSRV toolchain
         uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: "1.84.0"
+          toolchain: "1.85.0"
 
       - name: Setup Rust cache
         uses: Swatinem/rust-cache@v2
         with:
           workspaces: rust
-          key: msrv-1.84.0
+          key: msrv-1.85.0
 
       - name: Check compilation with MSRV
         run: |
@@ -104,11 +96,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Install just
-        shell: bash
-        run: |
-          mkdir -p "$HOME/.local/bin"
-          curl --proto '=https' --tlsv1.2 -sSf https://just.systems/install.sh | bash -s -- --to "$HOME/.local/bin"
-          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+        uses: extractions/setup-just@v3
 
       - name: Setup Rust toolchain
         uses: dtolnay/rust-toolchain@master
@@ -183,11 +171,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Install just
-        shell: bash
-        run: |
-          mkdir -p "$HOME/.local/bin"
-          curl --proto '=https' --tlsv1.2 -sSf https://just.systems/install.sh | bash -s -- --to "$HOME/.local/bin"
-          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+        uses: extractions/setup-just@v3
 
       - name: Setup Rust toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -268,11 +252,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Install just
-        shell: bash
-        run: |
-          mkdir -p "$HOME/.local/bin"
-          curl --proto '=https' --tlsv1.2 -sSf https://just.systems/install.sh | bash -s -- --to "$HOME/.local/bin"
-          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+        uses: extractions/setup-just@v3
 
       - name: Setup Rust toolchain
         uses: dtolnay/rust-toolchain@stable

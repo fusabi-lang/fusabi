@@ -82,15 +82,26 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
+        # Pin Windows to windows-2022 rather than windows-latest. The
+        # windows-latest image rollout intermittently trips the runner's bash
+        # function-injection guard while setup actions write to $GITHUB_ENV
+        # (actions/runner-images#14052), flaking the whole leg. Pinning to a
+        # stable image sidesteps the rollout window.
+        os: [ubuntu-latest, macos-latest, windows-2022]
         rust: [stable, beta]
         exclude:
           # Only run beta on Ubuntu to save CI minutes
           - os: macos-latest
             rust: beta
-          - os: windows-latest
+          - os: windows-2022
             rust: beta
     runs-on: ${{ matrix.os }}
+    # Use bash everywhere so `run:` steps behave identically across OSes and
+    # don't depend on the Windows default shell (PowerShell) where the
+    # $GITHUB_ENV guard behaves differently.
+    defaults:
+      run:
+        shell: bash
     steps:
       - name: Checkout code
         uses: actions/checkout@v4

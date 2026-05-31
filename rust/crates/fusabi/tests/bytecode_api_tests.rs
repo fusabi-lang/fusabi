@@ -379,7 +379,8 @@ fn test_empty_file_compilation() {
 
 #[test]
 fn test_file_not_found() {
-    let result = compile_file_to_bytecode("/tmp/definitely_does_not_exist_12345.fsx");
+    let missing = std::env::temp_dir().join("definitely_does_not_exist_12345.fsx");
+    let result = compile_file_to_bytecode(missing.to_str().unwrap());
     assert!(result.is_err(), "Should error on non-existent file");
 }
 

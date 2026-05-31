@@ -797,16 +797,17 @@ mod tests {
     fn test_compile_file_to_bytecode() {
         use std::io::Write;
 
-        // Create temporary file
-        let temp_path = "/tmp/test_compile.fsx";
+        // Create temporary file in the OS temp dir (cross-platform; avoids
+        // hardcoding a Unix-only path like "/tmp").
+        let temp_path = std::env::temp_dir().join("test_compile.fsx");
         let source = "let x = 42 in x";
 
-        let mut file = std::fs::File::create(temp_path).unwrap();
+        let mut file = std::fs::File::create(&temp_path).unwrap();
         file.write_all(source.as_bytes()).unwrap();
         drop(file);
 
         // Compile file to bytecode
-        let bytecode = compile_file_to_bytecode(temp_path).unwrap();
+        let bytecode = compile_file_to_bytecode(temp_path.to_str().unwrap()).unwrap();
 
         // Verify bytecode is valid
         assert!(bytecode.starts_with(FZB_MAGIC));
@@ -816,6 +817,6 @@ mod tests {
         assert_eq!(result.as_int(), Some(42));
 
         // Cleanup
-        std::fs::remove_file(temp_path).unwrap();
+        std::fs::remove_file(&temp_path).unwrap();
     }
 }

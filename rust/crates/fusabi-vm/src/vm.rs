@@ -753,6 +753,13 @@ impl Vm {
                             let mut all_args = applied_args.clone();
                             all_args.extend(new_args);
 
+                            // Remove the callee (the NativeFn value) from the stack.
+                            // After popping `argc` arguments above, it now sits on top of
+                            // the stack at `func_idx`. If left in place it would corrupt
+                            // any surrounding expression (e.g. the right operand of `&&`),
+                            // because the produced result is pushed *above* it.
+                            let _ = self.pop()?;
+
                             let total_args = all_args.len();
                             let arity_usize = arity as usize;
 

@@ -147,6 +147,11 @@ pub fn register_stdlib(vm: &mut Vm) {
             wrap_binary(args, string::string_format)
         });
 
+        // Boolean negation (global function, not in a module)
+        registry.register("not", |_vm, args| {
+            wrap_unary(args, |v| Ok(Value::Bool(!v.is_truthy())))
+        });
+
         // Print functions (global functions, not in a module)
         registry.register("print", |_vm, args| wrap_unary(args, print::print_value));
         registry.register("printfn", |_vm, args| {
@@ -598,6 +603,9 @@ pub fn register_stdlib(vm: &mut Vm) {
     // Register sprintf as a global alias for String.format
     vm.globals
         .insert("sprintf".to_string(), native("sprintf", 2));
+
+    // Register boolean negation as a global
+    vm.globals.insert("not".to_string(), native("not", 1));
 
     // Register print functions as globals
     vm.globals.insert("print".to_string(), native("print", 1));

@@ -138,7 +138,7 @@ The `main` branch has the following protections:
 
 ## Minimum Supported Rust Version (MSRV)
 
-**Current MSRV: 1.70.0** (Rust 2021 edition)
+**Current MSRV: 1.86.0** (Rust 2021 edition)
 
 The MSRV is enforced in CI via the `msrv-check` job.
 

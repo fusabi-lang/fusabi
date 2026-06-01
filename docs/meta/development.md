@@ -40,7 +40,7 @@ just test
 ### Development Environment
 
 **Required**:
-- Rust 1.70+ ([rustup.rs](https://rustup.rs))
+- Rust 1.86+ ([rustup.rs](https://rustup.rs))
 - Nushell 0.90+ ([nushell.sh](https://nushell.sh))
 
 **Recommended**:

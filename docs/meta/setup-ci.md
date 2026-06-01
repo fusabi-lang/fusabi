@@ -33,7 +33,7 @@ Ensure you have the following installed:
 
 ```bash
 # Check Rust
-rustc --version  # Should be 1.70+
+rustc --version  # Should be 1.86+
 
 # Check Cargo
 cargo --version

@@ -32,7 +32,7 @@ Source Code (.fsx) → AST → Bytecode (.fzb) → VM Execution
 
 ### Prerequisites
 
-- **Rust**: 1.70 or later
+- **Rust**: 1.86 or later
 - **Just**: Command runner for build automation
 - **Nu**: Optional, for advanced test scripts
 
